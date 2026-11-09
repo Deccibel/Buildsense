@@ -20,7 +20,7 @@ const POSITIONS = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
  *  e  championKeys adverses   o  adversaire direct (même rôle)   a  alliés
  *  nt 1 = pas de timeline (ordre d'achat déduit des objets finaux)
  */
-function extractRecords(match, timeline, dd) {
+function extractRecords(match, timeline, dd, { follow = null } = {}) {
   const info = match && match.info;
   if (!info || !Array.isArray(info.participants)) return [];
   const family = familyOfQueue(info.queueId);
@@ -131,6 +131,8 @@ function extractRecords(match, timeline, dd) {
       a: allies.map((a) => a.championId),
     };
     if (!hasTimeline) rec.nt = 1;
+    // joueur suivi (onglet Builds) : identifiant interne, jamais le puuid
+    if (follow && p.puuid && follow.has(p.puuid)) rec.fp = follow.get(p.puuid);
     records.push(rec);
   }
   return records;
@@ -155,4 +157,20 @@ function runesOf(p) {
   return out.length === 11 && out.every((x) => Number.isFinite(x) && x > 0) ? out : [];
 }
 
-module.exports = { extractRecords };
+
+/**
+ * Fiches "meta" légères (onglet Meta) : champion, poste, victoire et palier d'élo, sans le build.
+ * Classées solo/duo de la Faille uniquement.
+ */
+function extractLite(match, tier) {
+  const info = match && match.info;
+  if (!info || info.queueId !== 420 || !Array.isArray(info.participants) || !(info.gameDuration >= 900)) return [];
+  const patch = patchKey(info.gameVersion);
+  if (!patch) return [];
+  const m = match.metadata ? match.metadata.matchId : '';
+  return info.participants
+    .filter((p) => POSITIONS.has(p.teamPosition))
+    .map((p) => ({ m, v: patch, q: 'sr', t: tier, c: p.championId, r: p.teamPosition, w: p.win ? 1 : 0, lt: 1 }));
+}
+
+module.exports = { extractRecords, extractLite };

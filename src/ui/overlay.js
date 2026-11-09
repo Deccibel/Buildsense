@@ -266,6 +266,31 @@ function startersSection(vm) {
   );
 }
 
+/** Build complet : 6 cases (bottes + 5 objets), objets possédés cochés, objets de situation signalés. */
+function fullSection(vm) {
+  const items = vm.full && vm.full.length ? vm.full : vm.core;
+  if (!items.length) return null;
+  const why = items.filter((it) => it.situational && it.reason);
+  return h(
+    'div',
+    { class: 'sec hide-compact' },
+    label(vm.full && vm.full.length ? vm.fullTitle : vm.coreTitle || 'Build type', vm.coreWr && !/^Ton build/.test(vm.fullTitle || '') ? `${vm.coreWr} de victoires` : null),
+    h(
+      'div',
+      { class: 'fullbuild' },
+      items.map((it) =>
+        h(
+          'div',
+          { class: `slot ${it.owned ? 'owned' : ''} ${it.situational ? 'situ' : ''}`, title: it.reason || it.name },
+          icon(it.icon, it.name),
+          it.owned ? h('span', { class: 'check' }, '✓') : it.situational ? h('span', { class: 'flag' }, '!') : null,
+        ),
+      ),
+    ),
+    why.length ? h('div', { class: 'why' }, why.map((it) => h('div', null, h('b', null, `${it.name} : `), it.reason))) : null,
+  );
+}
+
 function renderIngame(vm) {
   return [
     header(
@@ -277,9 +302,7 @@ function renderIngame(vm) {
     optionsSection(vm),
     buySection(vm),
     alertsSection(vm),
-    vm.core.length
-      ? h('div', { class: 'sec hide-compact' }, label(vm.coreTitle || 'Build type', vm.coreWr ? `${vm.coreWr} de victoires` : null), pathRow(vm.core))
-      : null,
+    fullSection(vm),
     !vm.options.length && !vm.plan && !vm.core.length
       ? h('div', { class: 'sec empty' }, 'Pas encore de build pour ce champion dans ce mode : la collecte continue en fond.')
       : null,

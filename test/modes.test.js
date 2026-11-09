@@ -258,7 +258,7 @@ test('Collecte ARAM : de proche en proche à partir des joueurs du classement', 
       return [];
     },
   };
-  const crawler = new Crawler({ api, store, dd, getConfig: () => ({ favorites: [], collectModes: { sr: false, aram: true, mayhem: false, arena: false } }) });
+  const crawler = new Crawler({ api, store, dd, getConfig: () => ({ favorites: [], collectModes: { sr: false, aram: true, mayhem: false, arena: false, meta: false } }) });
   crawler.running = true;
   for (let i = 0; i < 8; i++) await crawler.step();
   assert.ok(queues.every((q) => q === 450), 'seulement la file ARAM');
@@ -278,7 +278,7 @@ test('Collecte : un mode hors rotation est mis en pause', async () => {
       return [];
     },
   };
-  const crawler = new Crawler({ api, store, dd, getConfig: () => ({ favorites: [], collectModes: { sr: false, aram: false, mayhem: true, arena: false } }) });
+  const crawler = new Crawler({ api, store, dd, getConfig: () => ({ favorites: [], collectModes: { sr: false, aram: false, mayhem: true, arena: false, meta: false } }) });
   crawler.running = true;
   for (let i = 0; i < 31; i++) await crawler.step();
   assert.equal(crawler.status().families.mayhem.paused, true);

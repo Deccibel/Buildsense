@@ -60,7 +60,13 @@ function findOpponent(game, role, store) {
 const TRINKETS = new Set([3340, 3363, 3364, 3330]);
 const STARTER_WINDOW = 150; // secondes : on montre le départ tant que rien n'est acheté
 
-function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice = null }) {
+/** Build favori (onglet Builds) pour ce champion et ce poste. */
+function presetFor(presets, champKey, role) {
+  const p = presets && (presets[`${champKey}|${role || ''}`] || presets[`${champKey}|`]);
+  return p && Array.isArray(p.items) && p.items.length ? { set: new Set(p.items.map(Number)), label: p.label || 'ton build' } : null;
+}
+
+function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice = null, presets = null }) {
   mode = mode || detectMode({ gameMode: game.gameMode, mapNumber: game.mapNumber, queueId: game.queueId });
   if (!mode.supported) return messageVM(mode.label || 'Mode non pris en charge', mode.message || 'Ce mode n’est pas pris en charge.');
   const champ = game.me.champ;
@@ -69,6 +75,7 @@ function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice =
   const role = picked.role;
   const opponent = mode.roles ? findOpponent(game, role, store) : null;
   const prof = rec.profile(champ.key, role, mode.family);
+  const preset = mode.family === 'sr' ? presetFor(presets, champ.key, role) : null;
   // Arena : les adversaires changent à chaque manche, pas d'analyse de compo
   const enemies = mode.teams ? game.enemies : [];
   const analysis = analyzeEnemies(enemies, dd);
@@ -83,7 +90,9 @@ function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice =
     oppKey: opponent && opponent.champ ? opponent.champ.key : 0,
     needs,
     gold: game.me.gold,
+    preset: preset && preset.set,
   });
+  result.presetLabel = preset ? preset.label : null;
   const vm = ingameVM({ dd, game, analysis, needs, rec: result, opponent, latestPatch: store.latestPatch(), hasKey, mode, roleSource: picked.source });
   // Début de partie, rien d'acheté : meilleur départ parmi les choix courants
   const bought = game.me.items.filter((id) => !TRINKETS.has(id));
@@ -118,7 +127,7 @@ function guessChampSelectOpponent(cs, store) {
   return best;
 }
 
-function computeChampSelect({ dd, store, rec, cs, hasKey, importHotkey, mode = null, roleChoice = null }) {
+function computeChampSelect({ dd, store, rec, cs, hasKey, importHotkey, mode = null, roleChoice = null, presets = null }) {
   if (!cs) return null;
   mode = mode || detectMode({ queueId: cs.queueId, mapNumber: cs.mapId, gameMode: cs.gameMode });
   if (!mode.supported) return messageVM(mode.label || 'Mode non pris en charge', mode.message || 'Ce mode n’est pas pris en charge.');
@@ -135,7 +144,10 @@ function computeChampSelect({ dd, store, rec, cs, hasKey, importHotkey, mode = n
     family: mode.family,
     oppKey: opponent ? opponent.key : 0,
     enemyKeys: mode.teams ? cs.enemies.map((c) => c.key) : [],
+    preset: mode.family === 'sr' ? (presetFor(presets, cs.myChampion.key, role) || {}).set : null,
   });
+  const csPreset = mode.family === 'sr' ? presetFor(presets, cs.myChampion.key, role) : null;
+  result.presetLabel = csPreset ? csPreset.label : null;
   const vm = champSelectVM({ dd, cs, rec: result, opponent, latestPatch: store.latestPatch(), hasKey, importHotkey, mode, roleSource: picked.source });
   vm.roleInfo = { role, source: picked.source, champKey: cs.myChampion.key, roles: !!mode.roles };
   // de quoi écrire la page d'objets de la boutique (client LoL)
@@ -150,4 +162,4 @@ function computeChampSelect({ dd, store, rec, cs, hasKey, importHotkey, mode = n
   return vm;
 }
 
-module.exports = { computeIngame, computeChampSelect, findOpponent, guessChampSelectOpponent, resolveRole, normRole, ROLE_IDS };
+module.exports = { presetFor, computeIngame, computeChampSelect, findOpponent, guessChampSelectOpponent, resolveRole, normRole, ROLE_IDS };

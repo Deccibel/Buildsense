@@ -23,6 +23,8 @@ class Store extends EventEmitter {
     this.records = [];
     this.byChamp = new Map();
     this.byPosition = new Map();
+    this.meta = []; // fiches légères de l'onglet Meta (autres paliers d'élo)
+    this.metaCache = null;
     this.seen = new Set();
     this.patchCounts = new Map();
     this.familyCounts = new Map();
@@ -58,6 +60,10 @@ class Store extends EventEmitter {
 
   index(rec) {
     this.records.push(rec);
+    if (rec.lt) {
+      this.meta.push(rec);
+      return;
+    }
     const k = keyOf(fam(rec), rec.c);
     let list = this.byChamp.get(k);
     if (!list) this.byChamp.set(k, (list = []));
@@ -126,6 +132,7 @@ class Store extends EventEmitter {
     this.records = [];
     this.byChamp = new Map();
     this.byPosition = new Map();
+    this.meta = [];
     this.patchCounts = new Map();
     this.familyCounts = new Map();
     for (const r of kept) this.index(r);
@@ -166,6 +173,7 @@ class Store extends EventEmitter {
     const matches = new Set();
     const byFamily = {};
     for (const r of this.records) {
+      if (r.lt) continue;
       if (!matches.has(r.m)) {
         matches.add(r.m);
         byFamily[fam(r)] = byFamily[fam(r)] || { records: 0, matches: 0 };
@@ -177,12 +185,52 @@ class Store extends EventEmitter {
       byFamily[f].records = n;
     }
     return {
-      records: this.records.length,
+      records: this.records.length - this.meta.length,
+      metaRecords: this.meta.length,
+      metaMatches: new Set(this.meta.map((r) => r.m)).size,
       matches: matches.size,
       patches: this.patches(),
       latestPatch: this.latestPatch(),
       byFamily,
     };
+  }
+
+  /**
+   * Meta d'un palier : par poste, pour chaque champion, parties, % de pick et % de victoire.
+   * tier : 'low' (Platine et moins), 'emerald', 'diamond', 'master', 'gm' (Grand Maître et plus).
+   * Le palier "gm" reprend les parties de la collecte des builds (Challenger / Grand Maître).
+   */
+  metaStats(tier) {
+    if (!this.metaCache || this.metaCache.version !== this.version) this.metaCache = { version: this.version, byTier: new Map() };
+    const hit = this.metaCache.byTier.get(tier);
+    if (hit) return hit;
+    const patch = this.latestPatch();
+    const src = tier === 'gm' ? this.byPositionAll() : this.meta.filter((r) => r.t === tier);
+    // dernier patch si assez de parties, sinon les patchs gardés
+    let recs = src.filter((r) => r.v === patch);
+    if (new Set(recs.map((r) => r.m)).size < 150) recs = src;
+    const matches = new Set(recs.map((r) => r.m)).size;
+    const roles = {};
+    for (const r of recs) {
+      if (!r.r) continue;
+      const byChamp = (roles[r.r] = roles[r.r] || new Map());
+      const c = byChamp.get(r.c) || { key: r.c, n: 0, wins: 0 };
+      c.n++;
+      c.wins += r.w ? 1 : 0;
+      byChamp.set(r.c, c);
+    }
+    const out = { tier, matches, patch: recs.length && recs.every((r) => r.v === patch) ? patch : null, roles: {} };
+    for (const [role, m] of Object.entries(roles)) {
+      out.roles[role] = [...m.values()].map((c) => ({ key: c.key, n: c.n, pick: matches ? c.n / matches : 0, win: c.n ? c.wins / c.n : 0 }));
+    }
+    this.metaCache.byTier.set(tier, out);
+    return out;
+  }
+
+  byPositionAll() {
+    const out = [];
+    for (const list of this.byPosition.values()) out.push(...list);
+    return out;
   }
 
   /** Nombre de fiches d'un champion, par famille. */

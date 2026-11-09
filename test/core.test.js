@@ -278,7 +278,7 @@ test('Collecte : parcours de l’échelle et priorité aux favoris (API simulée
     api,
     store,
     dd,
-    getConfig: () => ({ favorites: [103], collectDays: 14, collectModes: { sr: true, aram: false, mayhem: false, arena: false } }),
+    getConfig: () => ({ favorites: [103], collectDays: 14, collectModes: { sr: true, aram: false, mayhem: false, arena: false, meta: false } }),
   });
   crawler.running = true;
   for (let i = 0; i < 6 && store.records.length === 0; i++) await crawler.step();

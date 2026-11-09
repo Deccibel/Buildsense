@@ -10,7 +10,18 @@ function hotkeyLabel(accel) {
   const mac = process.platform === 'darwin';
   return String(accel || '')
     .replace(/CommandOrControl|CmdOrCtrl/g, mac ? 'Cmd' : 'Ctrl')
-    .replace(/Shift/g, 'Maj');
+    .replace(/Shift/g, 'Maj')
+    .replace(/Super/g, mac ? 'Cmd' : 'Win')
+    .replace(/\bnum(\d)\b/g, 'Pavé $1')
+    .replace(/\bnumadd\b/g, 'Pavé +')
+    .replace(/\bnumsub\b/g, 'Pavé -')
+    .replace(/\bnummult\b/g, 'Pavé *')
+    .replace(/\bnumdiv\b/g, 'Pavé /')
+    .replace(/\bSpace\b/g, 'Espace')
+    .replace(/\bUp\b/g, '↑')
+    .replace(/\bDown\b/g, '↓')
+    .replace(/\bLeft\b/g, '←')
+    .replace(/\bRight\b/g, '→');
 }
 
 function itemVM(dd, id, extra = {}) {
@@ -65,6 +76,7 @@ function sampleLine({ n, champName, latestPatch, hasKey, rec = {}, mode = null, 
 
 const WHO = { sr: 'des Chall/GM', aram: 'des joueurs ARAM', mayhem: 'des joueurs Mayhem', arena: 'des joueurs Arena' };
 const CORE_TITLE = { sr: 'Build type Chall/GM', aram: 'Build type ARAM', mayhem: 'Build type Mayhem', arena: 'Build type Arena' };
+const FULL_TITLE = { sr: 'Build complet Chall/GM', aram: 'Build complet ARAM', mayhem: 'Build complet Mayhem', arena: 'Build complet Arena' };
 
 /** Pastille de l'en-tête : le rôle sur la Faille, sinon le nom du mode. */
 function chipOf(mode, role) {
@@ -136,6 +148,13 @@ function ingameVM({ dd, game, analysis, needs, rec, opponent, latestPatch, hasKe
   const core = rec.core
     ? rec.core.ids.map((id) => itemVM(dd, id, { owned: me.items.includes(id) })).filter(Boolean)
     : [];
+  // build complet : bottes + 5 légendaires, adapté à la partie (objets possédés en tête)
+  const full = rec.full
+    ? [
+        ...(rec.full.boots ? [itemVM(dd, rec.full.boots.id, { owned: rec.full.boots.owned })] : []),
+        ...rec.full.items.map((x) => itemVM(dd, x.id, { owned: x.owned, situational: x.situational, reason: x.reasons[0] || null })),
+      ].filter(Boolean)
+    : [];
 
   // Bandeau de l'équipe adverse : uniquement ce que montre le tableau des scores
   const perByKey = new Map((analysis ? analysis.per : []).map((p) => [p.key, p]));
@@ -195,6 +214,8 @@ function ingameVM({ dd, game, analysis, needs, rec, opponent, latestPatch, hasKe
     core,
     coreTitle: CORE_TITLE[rec.dataFamily || 'sr'] || CORE_TITLE.sr,
     coreWr: rec.core && rec.core.n >= 8 ? pctInt(rec.core.wr) : null,
+    full,
+    fullTitle: rec.presetLabel ? `Ton build : ${rec.presetLabel}` : FULL_TITLE[rec.dataFamily || 'sr'] || FULL_TITLE.sr,
     alerts: showTeam ? alerts : [],
     skills: rec.skills ? { order: keysOf(rec.skills.order, '>') } : null,
     sample: sampleLine({ n: rec.n, champName: champ ? champ.name : '?', latestPatch, hasKey, rec, mode }),

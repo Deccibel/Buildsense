@@ -174,8 +174,15 @@ class Recommender {
     return prof;
   }
 
-  recordWeight(r, liveFeat, oppKey, prof = null) {
+  recordWeight(r, liveFeat, oppKey, prof = null, preset = null) {
     let w = this.patchWeight(r.v) * (r.nt ? 0.5 : 1);
+    if (preset && preset.size) {
+      // build favori : les parties qui lui ressemblent comptent davantage (point de départ, la partie ajuste ensuite)
+      const seq = this.legendarySeq(r);
+      let o = 0;
+      for (const id of seq) if (preset.has(id)) o++;
+      w *= 1 + (1.5 * o) / preset.size;
+    }
     if (prof && prof.blend && r.r === prof.role) w *= ROLE_BOOST;
     if (liveFeat && r.e && r.e.length) w *= Math.max(0.12, similarity(this.featuresFor(r.e), liveFeat));
     if (oppKey && r.o === oppKey && (!prof || !prof.blend || r.r === prof.role)) w *= 1.6;
@@ -256,13 +263,13 @@ class Recommender {
     return list[0] || null;
   }
 
-  coreBuild(prof, liveFeat, oppKey) {
+  coreBuild(prof, liveFeat, oppKey, preset = null) {
     const by3 = new Map();
     const by2 = new Map();
     for (const r of prof.recs) {
       const s = this.legendarySeq(r).slice(0, 3);
       if (s.length < 2) continue;
-      const w = this.recordWeight(r, liveFeat, oppKey, prof);
+      const w = this.recordWeight(r, liveFeat, oppKey, prof, preset);
       addTo(s.length === 3 ? by3 : by2, s.join(','), w, r.w);
     }
     const pick = (m) => {
@@ -309,7 +316,76 @@ class Recommender {
    * Options pour le prochain objet complété, pondérées par la ressemblance
    * entre la partie en cours et les parties de la base (compo adverse, adversaire direct, patch).
    */
-  nextItems({ champKey, role, family = 'sr', map = null, myItems = [], enemyKeys = [], oppKey = 0, needs = { boosts: [], bootBoosts: [] }, gold = 0 }) {
+  /**
+   * Build complet (5 objets légendaires) : les objets possédés d'abord, puis, case par case,
+   * l'objet que les meilleurs joueurs ont pris ensuite dans des parties similaires,
+   * avec les besoins de la partie (anti-soins, armure...) et le build favori éventuel.
+   */
+  completeBuild({ prof, ownedLeg, available, liveFeat, oppKey, boosts = [], preset = null, map, slots = 5 }) {
+    const dd = this.dd;
+    const chosen = ownedLeg.slice(0, slots);
+    const out = chosen.map((id) => ({ id, owned: true, situational: false, reasons: [] }));
+    let pending = boosts.filter((b) => !chosen.some((id) => itemMatches(dd.item(id), b)));
+    const free = (id) => {
+      const it = dd.item(id);
+      if (!it || chosen.includes(id) || !available(id)) return false;
+      return !(it.group && chosen.some((c) => (dd.item(c) || {}).group === it.group));
+    };
+    while (chosen.length < slots) {
+      const cand = new Map();
+      let total = 0;
+      for (const r of prof.recs) {
+        const seq = this.legendarySeq(r);
+        const next = seq.find(free);
+        if (!next) continue;
+        const overlap = seq.filter((id) => chosen.includes(id)).length;
+        const missing = chosen.filter((id) => !seq.includes(id)).length;
+        const w = this.recordWeight(r, liveFeat, oppKey, prof, preset) * (1 + 0.6 * overlap) * Math.pow(0.6, missing);
+        let c = cand.get(next);
+        if (!c) cand.set(next, (c = { id: next, w: 0, win: 0, n: 0 }));
+        c.w += w;
+        c.win += r.w ? w : 0;
+        c.n++;
+        total += w;
+      }
+      const opts = [...cand.values()].map((c) => ({
+        id: c.id,
+        score: (c.w / (total || 1)) * (1 + (smoothWr(c, 3) - 0.5)) + (preset && preset.has(c.id) ? 0.15 : 0),
+        reasons: [],
+        situational: false,
+      }));
+      for (const b of pending) {
+        const hit = opts.filter((o) => itemMatches(dd.item(o.id), b));
+        if (hit.length) {
+          for (const o of hit) {
+            o.score += b.w * 0.3;
+            addReason(o, b.reason);
+          }
+        } else if (b.w >= 0.45) {
+          const sid = this.situationalItem(b, prof, (id) => !free(id), map);
+          if (sid && !opts.some((o) => o.id === sid)) {
+            const o = { id: sid, score: b.w * 0.3, reasons: [], situational: true };
+            addReason(o, b.reason);
+            opts.push(o);
+          }
+        }
+      }
+      opts.sort((a, b) => b.score - a.score);
+      let pick = opts[0];
+      if (!pick) {
+        // peu de données : les objets les plus construits sur ce champion
+        const id = [...prof.itemFreq.entries()].sort((a, b) => b[1] - a[1]).map(([i]) => i).find(free);
+        if (!id) break;
+        pick = { id, reasons: [], situational: false };
+      }
+      chosen.push(pick.id);
+      out.push({ id: pick.id, owned: false, situational: pick.situational, reasons: pick.reasons });
+      pending = pending.filter((b) => !itemMatches(dd.item(pick.id), b));
+    }
+    return out;
+  }
+
+  nextItems({ champKey, role, family = 'sr', map = null, myItems = [], enemyKeys = [], oppKey = 0, needs = { boosts: [], bootBoosts: [] }, gold = 0, preset = null }) {
     const dd = this.dd;
     const prof = this.profile(champKey, role, family);
     const itemMap = map || prof.map;
@@ -334,7 +410,7 @@ class Recommender {
       if (!next) continue;
       const overlap = seq.filter((id) => owned.has(id)).length;
       const missing = ownedLeg.filter((id) => !seq.includes(id)).length;
-      const w = this.recordWeight(r, liveFeat, oppKey, prof) * (1 + 0.6 * overlap) * Math.pow(0.6, missing);
+      const w = this.recordWeight(r, liveFeat, oppKey, prof, preset) * (1 + 0.6 * overlap) * Math.pow(0.6, missing);
       let c = cand.get(next);
       if (!c) cand.set(next, (c = { id: next, w: 0, win: 0, n: 0, vsOpp: 0 }));
       c.w += w;
@@ -351,7 +427,7 @@ class Recommender {
       .map((c) => {
         const share = totalW ? c.w / totalW : 0;
         const wr = smoothWr(c, 3 * meanW);
-        return { id: c.id, share, wr, n: c.n, vsOpp: c.vsOpp, score: share * (1 + (wr - 0.5)), reasons: [], situational: false };
+        return { id: c.id, share, wr, n: c.n, vsOpp: c.vsOpp, score: share * (1 + (wr - 0.5)) + (preset && preset.has(c.id) ? 0.12 : 0), reasons: [], situational: false };
       });
 
     for (const b of needs.boosts || []) {
@@ -381,8 +457,15 @@ class Recommender {
     });
     const boots = ownsBoots ? null : this.bootsChoice(prof, liveFeat, oppKey, needs.bootBoosts || [], dd.hasMap(itemMap) ? itemMap : prof.map);
     const plan = options[0] ? planPurchase(dd, options[0].id, myItems, gold) : null;
-    const core = this.coreBuild(prof, liveFeat, oppKey);
+    const core = this.coreBuild(prof, liveFeat, oppKey, preset);
     if (core) core.ids = core.ids.filter(available);
+    const ownedBoots = [...owned].find((id) => {
+      const it = dd.item(id);
+      return it && it.isBoots;
+    });
+    const full = prof.n
+      ? this.completeBuild({ prof, ownedLeg, available, liveFeat, oppKey, boosts: needs.boosts || [], preset, map: dd.hasMap(itemMap) ? itemMap : prof.map })
+      : [];
 
     return {
       family: prof.family,
@@ -392,6 +475,7 @@ class Recommender {
       boots,
       plan,
       core: core && core.ids.length ? core : null,
+      full: full.length ? { items: full, boots: ownedBoots ? { id: ownedBoots, owned: true } : boots ? { id: boots.id, owned: false } : null } : null,
       skills: this.skillOrder(prof),
       n: prof.n,
       nAll: prof.nAll,
@@ -403,8 +487,64 @@ class Recommender {
     };
   }
 
+  /** Résumé d'un groupe de parties : 5 légendaires, bottes, rune principale, victoires. */
+  summarize(recs, core = []) {
+    const dd = this.dd;
+    const pos = [new Map(), new Map(), new Map(), new Map(), new Map()];
+    const boots = new Map();
+    const keys = new Map();
+    let wins = 0;
+    for (const r of recs) {
+      const seq = this.legendarySeq(r);
+      seq.slice(0, 5).forEach((id, i) => pos[i].set(id, (pos[i].get(id) || 0) + 1));
+      const b = (r.co || []).map((x) => x[0]).find((id) => (dd.item(id) || {}).isBoots);
+      if (b) boots.set(b, (boots.get(b) || 0) + 1);
+      if (r.ru && r.ru[1]) keys.set(r.ru[1], (keys.get(r.ru[1]) || 0) + 1);
+      wins += r.w ? 1 : 0;
+    }
+    const items = core.slice(0, 5);
+    for (let i = items.length; i < 5; i++) {
+      const best = [...pos[i].entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id).find((id) => !items.includes(id));
+      // repli : objet fréquent à une autre position
+      const any = best || [...pos.flatMap((m) => [...m.entries()])].sort((a, b) => b[1] - a[1]).map(([id]) => id).find((id) => !items.includes(id));
+      if (!any) break;
+      items.push(any);
+    }
+    const top = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)[0] || 0;
+    return { items, boots: top(boots), keystone: top(keys), n: recs.length, wr: smoothWr({ win: wins, w: recs.length }) };
+  }
+
+  /**
+   * Builds possibles pour un champion et un poste (onglet Builds) : les chemins d'objets les plus joués,
+   * et ceux des joueurs suivis (ex. "Comme Hide on bush").
+   */
+  buildVariants(champKey, role, { followed = [] } = {}) {
+    const prof = this.profile(champKey, role, 'sr');
+    const groups = new Map();
+    for (const r of prof.recs) {
+      const seq = this.legendarySeq(r);
+      if (seq.length < 3) continue;
+      const k = seq.slice(0, 3).join(',');
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    }
+    const total = [...groups.values()].reduce((s, g) => s + g.length, 0) || 1;
+    const out = [...groups.entries()]
+      .filter(([, g]) => g.length >= 3)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 5)
+      .map(([k, g], i) => ({ id: `core:${k}`, source: 'data', rank: i + 1, share: g.length / total, ...this.summarize(g, k.split(',').map(Number)) }));
+    const all = this.store.byChampion(Number(champKey), 'sr');
+    for (const f of followed) {
+      const g = all.filter((r) => r.fp === f.id && (!prof.role || r.r === prof.role || all.filter((x) => x.fp === f.id).every((x) => x.r !== prof.role)));
+      if (!g.length) continue;
+      out.push({ id: `player:${f.id}`, source: 'player', player: f.name, share: null, ...this.summarize(g) });
+    }
+    return { role: prof.role, mainRole: prof.mainRole, n: prof.n, variants: out };
+  }
+
   /** Recommandations pour la sélection des champions (runes, sorts, départ, ordre des compétences). */
-  champSelect({ champKey, role, family = 'sr', oppKey = 0, enemyKeys = [] }) {
+  champSelect({ champKey, role, family = 'sr', oppKey = 0, enemyKeys = [], preset = null }) {
     const prof = this.profile(champKey, role, family);
     const liveFeat = enemyKeys.length >= 2 ? this.featuresFor(enemyKeys) : null;
     const pages = new Map();
@@ -467,7 +607,7 @@ class Recommender {
       spells: top(spells, 2, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
       starts: top(starts, 3, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
       skills: this.skillOrder(prof),
-      core: this.coreBuild(prof, liveFeat, oppKey),
+      core: this.coreBuild(prof, liveFeat, oppKey, preset),
       boots: this.bootsChoice(prof, liveFeat, oppKey, []),
     };
   }

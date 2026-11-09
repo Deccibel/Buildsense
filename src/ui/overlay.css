@@ -1361,3 +1361,67 @@ kbd,
   color: var(--muted);
   font-size: 11px;
 }
+
+/* ---------- build complet (6 cases) ---------- */
+.fullbuild {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.fullbuild .slot {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.fullbuild .slot .ic {
+  width: 40px;
+  height: 40px;
+}
+
+.fullbuild .slot.owned .ic {
+  opacity: 0.5;
+}
+
+.fullbuild .slot.situ .ic {
+  box-shadow: 0 0 0 2px var(--warn);
+}
+
+.fullbuild .check,
+.fullbuild .flag {
+  position: absolute;
+  right: 0;
+  bottom: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 15px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fullbuild .check {
+  background: var(--ok);
+  color: #fff;
+}
+
+.fullbuild .flag {
+  background: var(--warn);
+  color: #1a1000;
+}
+
+.why {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.why b {
+  color: var(--warn);
+  font-weight: 700;
+}

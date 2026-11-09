@@ -48,6 +48,8 @@ function makeData({ lang = 'fr', extreme = false } = {}) {
     ...R.roleRecords(),
     ...R.supportRecords(),
     ...R.ahriSupportRecords(4),
+    ...R.ahriRecords(25, 99).map((r) => ({ ...r, m: `F_${r.m}`, fp: 'f1' })),
+    ...R.metaRecords(),
   ]);
   return { dd, store, rec: new Recommender({ store, dd }) };
 }
@@ -148,6 +150,8 @@ function dashboardState({ dd, store }, { live = null, rolePrefs = {}, phase = 'L
     favorites: [R.K.Ahri, R.K.Zed, R.K.Syndra, R.K.Thresh],
     rolePrefs,
     detectedLocale: 'fr_FR',
+    followed: [{ id: 'f1', name: 'Hide on bush#KR1', platform: 'kr' }],
+    buildPresets: { [`${R.K.Ahri}|MIDDLE`]: { items: [6655, 4645, 3089], label: 'Le plus joué' } },
   });
   const stats = store.stats();
   const favorites = config.favorites.map((key) => {
@@ -187,6 +191,7 @@ function dashboardState({ dd, store }, { live = null, rolePrefs = {}, phase = 'L
       role: vm && vm.roleInfo ? { ...vm.roleInfo, champion: vm.header.champion } : null,
     },
     live,
+    followed: config.followed.map((f) => ({ ...f, found: true })),
     overlay: { visible: !!vm, userHidden: false, moveMode: false, demo: live && live.source === 'demo' ? 'ingame' : null },
     hotkeys: Object.fromEntries(Object.entries(config.hotkeys).map(([k, v]) => [k, hotkeyLabel(v)])),
     hotkeyErrors: [],

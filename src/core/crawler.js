@@ -2,7 +2,7 @@
 
 const { EventEmitter } = require('events');
 const { ApiKeyError } = require('./riotApi');
-const { extractRecords } = require('./extract');
+const { extractRecords, extractLite } = require('./extract');
 const { FAMILIES, FAMILY_IDS, familyOfQueue } = require('./modes');
 const { sleep, shuffle } = require('./util');
 
@@ -15,8 +15,13 @@ const EMPTY_LIMIT = 30; // joueurs consécutifs sans partie dans un mode
 const BACKOFF_MS = 30 * 60 * 1000; // mode probablement hors rotation : pause de 30 min
 
 // Part du temps de collecte de chaque mode (le mode auquel tu joues compte triple)
-const WEIGHTS = { sr: 3, aram: 2, mayhem: 1, arena: 1 };
-const DEFAULT_MODES = { sr: true, aram: true, mayhem: true, arena: true };
+const WEIGHTS = { sr: 3, aram: 2, mayhem: 1, arena: 1, meta: 1 };
+const DEFAULT_MODES = { sr: true, aram: true, mayhem: true, arena: true, meta: true };
+// collecte "meta" : paliers d'élo sous Grand Maître (Grand Maître et plus = collecte des builds)
+const META_TIERS = ['low', 'emerald', 'diamond', 'master'];
+const LOW_TIERS = ['PLATINUM', 'PLATINUM', 'GOLD', 'GOLD', 'SILVER', 'BRONZE', 'IRON'];
+const DIVISIONS = ['I', 'II', 'III', 'IV'];
+const ALL_FAMILIES = [...FAMILY_IDS, 'meta'];
 
 /**
  * Collecte en tâche de fond des parties, pour chaque famille de modes :
@@ -42,9 +47,12 @@ class Crawler extends EventEmitter {
     this.favPlayersFound = 0;
     this.favKey = '';
     this.fam = {};
-    for (const f of FAMILY_IDS) this.fam[f] = this.newFamilyState();
+    for (const f of ALL_FAMILIES) this.fam[f] = this.newFamilyState();
     this.matchesAdded = 0;
     this.recordsAdded = 0;
+    this.metaIdx = 0;
+    this.metaPools = {}; // palier -> { at, players: [puuid] }
+    this.followPuuid = new Map(); // id du joueur suivi -> puuid (résolu à chaque session)
     this.lastError = null;
     this.state = 'stopped';
     this.failures = 0;
@@ -62,7 +70,7 @@ class Crawler extends EventEmitter {
   status() {
     const modes = this.enabledModes();
     const families = {};
-    for (const f of FAMILY_IDS) {
+    for (const f of ALL_FAMILIES) {
       const s = this.fam[f];
       families[f] = { enabled: !!modes[f], matchesAdded: s.matchesAdded, paused: s.backoffUntil > Date.now() };
     }
@@ -110,7 +118,9 @@ class Crawler extends EventEmitter {
   reset() {
     this.ladder = [];
     this.ladderAt = 0;
-    for (const f of FAMILY_IDS) this.fam[f] = this.newFamilyState();
+    this.followPuuid = new Map();
+    this.metaPools = {};
+    for (const f of ALL_FAMILIES) this.fam[f] = this.newFamilyState();
   }
 
   setPausedForGame(paused) {
@@ -177,7 +187,7 @@ class Crawler extends EventEmitter {
     this.ladderAt = Date.now();
     this.masteryIdx = 0;
     this.favPlayersFound = 0;
-    for (const f of FAMILY_IDS) this.fam[f].ladderIdx = 0;
+    for (const f of ALL_FAMILIES) this.fam[f].ladderIdx = 0;
   }
 
   /** Les anciennes réponses de league-v4 ne donnaient que summonerId. */
@@ -199,7 +209,7 @@ class Crawler extends EventEmitter {
     const modes = this.enabledModes();
     const now = Date.now();
     const active = this.getActiveFamily();
-    const list = FAMILY_IDS.filter((f) => modes[f] && this.fam[f].backoffUntil <= now);
+    const list = ALL_FAMILIES.filter((f) => modes[f] && this.fam[f].backoffUntil <= now);
     if (!list.length) return null;
     let total = 0;
     let best = null;
@@ -231,6 +241,11 @@ class Crawler extends EventEmitter {
     }
 
     if (family === 'sr') {
+      // joueurs suivis (onglet Builds), sur leur serveur
+      for (const f of this.followed()) {
+        const puuid = await this.followedPuuid(f);
+        if (puuid && !this.recentlyProcessed('sr', puuid)) return { puuid, priority: true, platform: f.platform, followId: f.id };
+      }
       const favs = this.favorites();
       if (favs.size && this.masteryIdx < this.ladder.length && this.favPlayersFound < MAX_FAV_PLAYERS) {
         const entry = this.ladder[this.masteryIdx++];
@@ -254,6 +269,59 @@ class Crawler extends EventEmitter {
     return puuid ? { puuid, priority: false } : null;
   }
 
+  followed() {
+    return (this.getConfig().followed || []).filter((f) => f && f.id && f.name && f.name.includes('#'));
+  }
+
+  async followedPuuid(f) {
+    if (this.followPuuid.has(f.id)) return this.followPuuid.get(f.id);
+    const i = f.name.lastIndexOf('#');
+    const acc = await this.api.accountByRiotId(f.name.slice(0, i), f.name.slice(i + 1), f.platform);
+    const puuid = (acc && acc.puuid) || null;
+    this.followPuuid.set(f.id, puuid);
+    this.emit('followed', { id: f.id, found: !!puuid });
+    return puuid;
+  }
+
+  followMap() {
+    const m = new Map();
+    for (const [id, puuid] of this.followPuuid) if (puuid) m.set(puuid, id);
+    return m;
+  }
+
+  /** Collecte meta : quelques parties récentes de joueurs d'un palier, sans timeline (1 requête par partie). */
+  async metaStep() {
+    const tier = META_TIERS[this.metaIdx++ % META_TIERS.length];
+    let pool = this.metaPools[tier];
+    if (!pool || Date.now() - pool.at > LADDER_TTL || !pool.players.length) {
+      let entries = [];
+      if (tier === 'master') {
+        const l = await this.api.league('master');
+        entries = (l && l.entries) || [];
+      } else {
+        const t = tier === 'low' ? LOW_TIERS[Math.floor(Math.random() * LOW_TIERS.length)] : tier.toUpperCase();
+        const d = DIVISIONS[Math.floor(Math.random() * DIVISIONS.length)];
+        entries = (await this.api.leagueEntries(t, d, 1 + Math.floor(Math.random() * 3))) || [];
+      }
+      pool = this.metaPools[tier] = { at: Date.now(), players: shuffle(entries.map((e) => e.puuid).filter(Boolean)).slice(0, 60) };
+    }
+    const puuid = pool.players.shift();
+    if (!puuid) return;
+    const days = this.getConfig().collectDays || 14;
+    const ids = await this.api.matchIds(puuid, { queue: 420, count: 4, startTime: Math.floor(Date.now() / 1000) - days * 86400 });
+    for (const id of ids || []) {
+      if (!this.running || this.pausedForGame) break;
+      if (this.store.hasSeen(id)) continue;
+      const match = await this.api.match(id);
+      this.store.markSeen(id);
+      const recs = extractLite(match, tier);
+      if (!recs.length) continue;
+      this.store.add(recs);
+      this.fam.meta.matchesAdded++;
+      this.emitStatus();
+    }
+  }
+
   async step() {
     await this.ensureLadder();
     const family = this.pickFamily();
@@ -261,6 +329,7 @@ class Crawler extends EventEmitter {
       await sleep(5000);
       return;
     }
+    if (family === 'meta') return this.metaStep();
     const s = this.fam[family];
     const pl = await this.nextPlayer(family);
     if (!pl) {
@@ -273,6 +342,7 @@ class Crawler extends EventEmitter {
       queue: FAMILIES[family].collectQueue,
       count: pl.priority ? 20 : 10,
       startTime,
+      platform: pl.platform || null,
     });
     s.processed.set(pl.puuid, Date.now());
     if (!ids || !ids.length) {
@@ -287,18 +357,18 @@ class Crawler extends EventEmitter {
     for (const id of ids) {
       if (!this.running || this.pausedForGame) break;
       if (this.store.hasSeen(id)) continue;
-      await this.processMatch(id);
+      await this.processMatch(id, pl.platform || null);
     }
   }
 
-  async processMatch(id) {
-    const match = await this.api.match(id);
+  async processMatch(id, platform = null) {
+    const match = await this.api.match(id, platform);
     this.store.markSeen(id);
     const family = match && match.info ? familyOfQueue(match.info.queueId) : null;
     if (!family || !(match.info.gameDuration >= FAMILIES[family].minDuration)) return;
     // sans timeline (rare), l'ordre d'achat est déduit des objets finaux
-    const timeline = await this.api.timeline(id);
-    const recs = extractRecords(match, timeline, this.dd);
+    const timeline = await this.api.timeline(id, platform);
+    const recs = extractRecords(match, timeline, this.dd, { follow: this.followMap() });
     if (!recs.length) return;
     this.store.add(recs);
     this.matchesAdded++;
@@ -320,4 +390,4 @@ class Crawler extends EventEmitter {
   }
 }
 
-module.exports = { Crawler, DEFAULT_MODES };
+module.exports = { Crawler, DEFAULT_MODES, META_TIERS };

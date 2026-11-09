@@ -255,3 +255,36 @@ test('Boutique : page d’objets BuildSense ajoutée sans toucher aux pages du j
   assert.deepEqual(sets[0].blocks[0].items, [{ id: '1056', count: 1 }, { id: '2003', count: 2 }]);
   assert.ok(sets.some((s) => s.uid === 'perso-1'));
 });
+
+test('Build complet : 6 cases, objets possédés en tête, adapté à la partie et au build favori', () => {
+  const store = makeStore();
+  const rec = new Recommender({ store, dd });
+  const g = clone(demoGame);
+  const vm = computeIngame({ dd, store, rec, game: normalizeLive(g, dd), hasKey: true });
+  assert.equal(vm.full.length, 6, 'bottes + 5 objets');
+  const ids = vm.full.map((it) => it.id);
+  assert.equal(new Set(ids).size, 6, 'pas de doublon');
+  const me = normalizeLive(clone(demoGame), dd).me;
+  for (const id of me.items) if (dd.isLegendary(id)) assert.ok(ids.includes(id), `objet possédé ${id} dans le build`);
+  assert.ok(vm.full.filter((it) => it.owned).length >= 1);
+
+  // build favori : il oriente le build (point de départ), sans retirer l'adaptation à la partie
+  const presets = { [`${K.Ahri}|MIDDLE`]: { items: [6655, 3135, 3102], label: 'Comme Faker' } };
+  const vp = computeIngame({ dd, store, rec, game: normalizeLive(clone(demoGame), dd), hasKey: true, presets });
+  assert.equal(vp.fullTitle, 'Ton build : Comme Faker');
+  assert.ok(vp.full.some((it) => it.id === 3135), 'Bâton du Vide du build favori repris');
+});
+
+test('Onglet Builds : variantes d’un champion, et builds d’un joueur suivi', () => {
+  const extra = ahriRecords(30, 99).map((r) => ({ ...r, m: `P_${r.m}`, fp: 'faker' }));
+  const store = makeStore(extra);
+  const rec = new Recommender({ store, dd });
+  const res = rec.buildVariants(K.Ahri, 'MIDDLE', { followed: [{ id: 'faker', name: 'Hide on bush' }] });
+  const data = res.variants.filter((v) => v.source === 'data');
+  assert.ok(data.length >= 2 && data.length <= 5);
+  assert.ok(data[0].share >= data[1].share, 'triées par popularité');
+  for (const v of data) assert.ok(v.items.length >= 3 && v.items.length <= 5 && new Set(v.items).size === v.items.length);
+  const p = res.variants.find((v) => v.source === 'player');
+  assert.equal(p.player, 'Hide on bush');
+  assert.equal(p.n, 30);
+});

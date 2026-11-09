@@ -61,6 +61,7 @@ const MODES = [
   ['aram', 'ARAM', 'Parties ARAM de ces joueurs et de leurs adversaires'],
   ['mayhem', 'ARAM Mayhem', 'Quand le mode est disponible (sinon données ARAM)'],
   ['arena', 'Arena', 'Quand le mode est disponible'],
+  ['meta', 'Meta (autres élos)', 'Quelques parties de chaque palier, pour l’onglet Meta'],
 ];
 const LANGS = [
   ['fr_FR', 'Français'],
@@ -149,6 +150,8 @@ function goto(page) {
   for (const p of $$('.page')) p.hidden = p.id !== `page-${page}`;
   $('main').scrollTop = 0;
   if (page === 'champs') loadChampions();
+  if (page === 'builds') loadBuilds();
+  if (page === 'meta') loadMeta();
   if (page === 'live') renderLive(state, true);
 }
 
@@ -338,7 +341,8 @@ function renderModeStats(s) {
       const f = fams[id] || {};
       const on = (s.config.collectModes || {})[id] !== false;
       const chip = el('div', `mchip ${on ? '' : 'off'}`);
-      chip.append(el('span', 'mn', name), el('b', '', fmt((by[id] || {}).matches || 0)), el('span', 'mu', 'parties'));
+      const nm = id === 'meta' ? (s.store && s.store.metaMatches) || 0 : (by[id] || {}).matches || 0;
+      chip.append(el('span', 'mn', name), el('b', '', fmt(nm)), el('span', 'mu', 'parties'));
       if (!on) chip.append(el('span', 'ms', 'désactivé'));
       else if (f.paused) chip.append(el('span', 'ms', 'hors rotation ?'));
       return chip;
@@ -515,7 +519,7 @@ function lvPath(items, extra) {
     { class: 'lv-path' },
     items.map((c, i) => [
       i ? h('span', { class: 'chev' }, '›') : null,
-      h('div', { class: `lv-step ${c.owned ? 'owned' : ''}` }, ico(c.icon, c.name), h('span', null, c.name), c.owned ? h('span', { class: 'ok' }, '✓') : null),
+      h('div', { class: `lv-step ${c.owned ? 'owned' : ''} ${c.situational ? 'situ' : ''}` }, ico(c.icon, c.name), h('span', null, c.name), c.owned ? h('span', { class: 'ok' }, '✓') : null),
     ]),
     extra ? [h('span', { class: 'chev' }, '+'), h('div', { class: 'lv-step' }, ico(extra.icon, extra.name), h('span', null, extra.name))] : null,
   );
@@ -587,7 +591,18 @@ function liveIngame(vm) {
       ),
     );
   }
-  if (vm.core.length) left.push(card(vm.coreTitle || 'Build type', vm.coreWr ? `${vm.coreWr} de victoires` : null, lvPath(vm.core)));
+  const fullItems = vm.full && vm.full.length ? vm.full : vm.core;
+  if (fullItems.length) {
+    const why = fullItems.filter((it) => it.situational && it.reason);
+    left.push(
+      card(
+        vm.full && vm.full.length ? vm.fullTitle : vm.coreTitle || 'Build type',
+        vm.coreWr ? `${vm.coreWr} de victoires` : null,
+        lvPath(fullItems),
+        why.length ? h('div', { class: 'lv-why' }, why.map((it) => h('div', null, h('b', null, `${it.name} : `), it.reason))) : null,
+      ),
+    );
+  }
   if (!vm.options.length && !p && !vm.core.length) left.push(card(null, null, h('div', { class: 'muted' }, 'Pas encore de build pour ce champion dans ce mode : la collecte continue en fond.')));
 
   if (vm.enemies.length) {
@@ -878,6 +893,253 @@ function renderUpdate(s) {
   if (document.activeElement !== $('#updRepo')) $('#updRepo').value = (u && u.repo) || '';
 }
 
+// ---------------------------------------------------------------- builds
+
+let bSel = { champKey: 0, role: '' };
+let bData = null;
+
+async function loadBuilds() {
+  if (!champions.length) champions = await api.invoke('champions:list');
+  const sel = $('#bChamp');
+  const key = champions.map((c) => c.key).join(',');
+  if (sel.dataset.key !== key) {
+    sel.dataset.key = key;
+    const first = el('option', '', champions.length ? 'Choisis un champion…' : 'Champions en chargement…');
+    first.value = '';
+    sel.replaceChildren(
+      first,
+      ...champions.map((c) => {
+        const o = el('option', '', c.name);
+        o.value = String(c.key);
+        return o;
+      }),
+    );
+    if (!bSel.champKey && state && state.favorites.length) bSel.champKey = state.favorites[0].key;
+  }
+  sel.value = bSel.champKey ? String(bSel.champKey) : '';
+  const seg = $('#bRole');
+  if (!seg.childElementCount) {
+    seg.append(
+      ...[['', 'Auto'], ...ROLES].map(([v, t]) =>
+        h('button', { 'data-role': v, onclick: () => { bSel.role = v; refreshBuilds(); } }, t),
+      ),
+    );
+  }
+  await refreshBuilds();
+}
+
+async function refreshBuilds() {
+  for (const b of $$('#bRole button')) b.classList.toggle('active', b.dataset.role === bSel.role);
+  bData = bSel.champKey ? await api.invoke('builds:get', { champKey: bSel.champKey, role: bSel.role }) : null;
+  renderBuilds();
+}
+
+function renderBuilds() {
+  const view = $('#bView');
+  const d = bData;
+  if (!d) {
+    view.replaceChildren(h('div', { class: 'card lv-empty' }, h('p', { class: 'muted' }, 'Choisis un champion pour voir ses builds.')));
+    return;
+  }
+  const roleName = ROLE_LABEL[d.role] || '—';
+  const head = h(
+    'div',
+    { class: 'card b-head' },
+    ico(d.icon, d.champion),
+    h('div', null, h('h3', null, d.champion, ' ', h('span', { class: 'chip' }, roleName)), h('p', { class: 'muted' }, `${fmt(d.n)} parties Chall/GM analysées${bSel.role ? '' : ' · poste le plus joué'}`)),
+  );
+  if (!d.variants.length) {
+    view.replaceChildren(head, h('div', { class: 'card lv-empty' }, h('p', { class: 'muted' }, 'Pas encore assez de parties pour ce champion à ce poste : ajoute-le à tes favoris pour accélérer la collecte.')));
+    return;
+  }
+  view.replaceChildren(
+    head,
+    ...d.variants.map((v) =>
+      h(
+        'div',
+        { class: `card b-var ${v.favorite ? 'b-fav' : ''}` },
+        h(
+          'div',
+          { class: 'lv-t' },
+          h('h3', null, v.label, v.favorite ? h('span', { class: 'tag' }, '★ ton build') : null),
+          h('span', { class: 'meta' }, [v.share ? `${Math.round(v.share * 100)} % des parties` : null, `${fmt(v.n)} parties`, v.wr ? `${Math.round(v.wr * 100)} % de victoires` : null].filter(Boolean).join(' · ')),
+        ),
+        lvPath(v.boots ? [v.boots, ...v.items] : v.items),
+        h(
+          'div',
+          { class: 'b-foot' },
+          v.keystone ? h('span', { class: 'b-ks' }, ico(v.keystone.icon, v.keystone.name, 'round'), v.keystone.name) : h('span'),
+          v.favorite
+            ? h('button', { class: 'btn ghost small', onclick: async () => { bData = await api.invoke('builds:unfavorite', { champKey: d.champKey, role: d.role }); renderBuilds(); } }, 'Retirer des favoris')
+            : h(
+                'button',
+                {
+                  class: 'btn small',
+                  onclick: async () => {
+                    bData = await api.invoke('builds:favorite', { champKey: d.champKey, role: d.role, items: v.items.map((i) => i.id), label: v.label });
+                    renderBuilds();
+                    showToast({ text: `Build favori enregistré pour ${d.champion} ${roleName}.`, level: 'ok' });
+                  },
+                },
+                '★ En faire mon build',
+              ),
+        ),
+      ),
+    ),
+  );
+}
+
+function renderFollowed(s) {
+  const pf = $('#fPlatform');
+  if (!pf.childElementCount) {
+    pf.append(
+      ...s.platforms.map((p) => {
+        const o = el('option', '', PLATFORM_LABELS[p] || p.toUpperCase());
+        o.value = p;
+        return o;
+      }),
+    );
+    pf.value = s.config.platform;
+  }
+  const key = JSON.stringify(s.followed);
+  if ($('#fList').dataset.key === key) return;
+  $('#fList').dataset.key = key;
+  $('#fList').replaceChildren(
+    ...(s.followed.length
+      ? s.followed.map((f) =>
+          h(
+            'div',
+            { class: 'pref' },
+            h('div', { class: 'pn' }, h('b', null, f.name), h('small', null, `${PLATFORM_LABELS[f.platform] || f.platform}${f.found === false ? ' · introuvable (vérifie le pseudo et le serveur)' : f.found ? ' · parties en collecte' : ' · en attente de la collecte'}`)),
+            h('button', { class: 'btn ghost small', onclick: async () => { const r = await api.invoke('follow:remove', f.id); state = r.state; render(); } }, 'Ne plus suivre'),
+          ),
+        )
+      : [el('div', 'muted small', 'Aucun joueur suivi.')]),
+  );
+}
+
+// ---------------------------------------------------------------- meta
+
+const TIERS = [
+  ['low', 'Platine et −'],
+  ['emerald', 'Émeraude'],
+  ['diamond', 'Diamant'],
+  ['master', 'Maître'],
+  ['gm', 'GM et +'],
+];
+let mSel = { tier: 'gm', sort: 'pick' };
+
+async function loadMeta() {
+  if (!$('#mTier').childElementCount) {
+    $('#mTier').append(...TIERS.map(([v, t]) => h('button', { 'data-tier': v, onclick: () => { mSel.tier = v; loadMeta(); } }, t)));
+    $('#mSort').append(
+      ...[['pick', '% de pick'], ['win', '% de victoire']].map(([v, t]) => h('button', { 'data-sort': v, onclick: () => { mSel.sort = v; loadMeta(); } }, t)),
+    );
+  }
+  for (const b of $$('#mTier button')) b.classList.toggle('active', b.dataset.tier === mSel.tier);
+  for (const b of $$('#mSort button')) b.classList.toggle('active', b.dataset.sort === mSel.sort);
+  const d = await api.invoke('meta:get', mSel.tier);
+  const view = $('#mView');
+  if (!d) return view.replaceChildren();
+  const tierName = TIERS.find(([v]) => v === mSel.tier)[1];
+  if (d.matches < 30) {
+    view.replaceChildren(
+      h('div', { class: 'card lv-empty' }, h('h3', null, `${tierName} : pas encore assez de parties`), h('p', { class: 'muted' }, `${fmt(d.matches)} parties pour l'instant. La collecte meta tourne en fond (Réglages › Collecte › Meta) : reviens dans un moment.`)),
+    );
+    return;
+  }
+  // % de victoire : seulement les champions assez joués (sinon 3 parties gagnées = 100 %)
+  const minGames = Math.max(8, Math.round(d.matches * 0.01));
+  const pct = (x) => `${(x * 100).toFixed(1).replace('.', ',')} %`;
+  view.replaceChildren(
+    h(
+      'div',
+      { class: 'meta-grid' },
+      ROLES.map(([role, label]) => {
+        const list = (d.roles[role] || [])
+          .filter((c) => mSel.sort === 'pick' || c.n >= minGames)
+          .sort((a, b) => (mSel.sort === 'pick' ? b.pick - a.pick : b.win - a.win))
+          .slice(0, 5);
+        return h(
+          'div',
+          { class: 'card meta-col' },
+          h('h3', null, label),
+          list.length
+            ? list.map((c, i) =>
+                h(
+                  'div',
+                  { class: 'meta-row' },
+                  h('span', { class: 'rk' }, String(i + 1)),
+                  ico(c.icon, c.name, 'round'),
+                  h('div', { class: 'mn' }, h('b', null, c.name), h('small', null, `${fmt(c.n)} parties`)),
+                  h('div', { class: 'mv' }, h('span', { class: mSel.sort === 'pick' ? 'on' : '' }, pct(c.pick)), h('span', { class: `w ${mSel.sort === 'win' ? 'on' : ''} ${c.win >= 0.52 ? 'good' : c.win < 0.48 ? 'bad' : ''}` }, pct(c.win))),
+                ),
+              )
+            : h('div', { class: 'muted small' }, 'Pas assez de parties.'),
+        );
+      }),
+    ),
+    h('p', { class: 'muted small' }, `${fmt(d.matches)} parties analysées${d.patch ? ` · patch ${d.patch}` : ' · derniers patchs'}. Colonnes : % de pick puis % de victoire.${mSel.sort === 'win' ? ` Champions joués au moins ${minGames} fois.` : ''}`),
+  );
+}
+
+// ---------------------------------------------------------------- raccourcis
+
+let recording = null; // nom du raccourci en cours de modification
+
+/**
+ * Combinaison -> accélérateur Electron. Lettres : caractère produit (AZERTY, QWERTZ...),
+ * ou touche physique pour les claviers non latins ; chiffres, F1-F24, pavé, flèches : touche physique.
+ */
+function accelFromEvent(e) {
+  const mods = [];
+  if (e.ctrlKey) mods.push('CommandOrControl');
+  if (e.altKey) mods.push('Alt');
+  if (e.shiftKey) mods.push('Shift');
+  if (e.metaKey) mods.push('Super');
+  const c = e.code || '';
+  let key = null;
+  if (/^[a-z]$/i.test(e.key)) key = e.key.toUpperCase();
+  else if (/^Key[A-Z]$/.test(c)) key = c.slice(3);
+  else if (/^Digit\d$/.test(c)) key = c.slice(5);
+  else if (/^F([1-9]|1\d|2[0-4])$/.test(c)) key = c;
+  else if (/^Numpad\d$/.test(c)) key = `num${c.slice(6)}`;
+  else {
+    const map = {
+      NumpadAdd: 'numadd', NumpadSubtract: 'numsub', NumpadMultiply: 'nummult', NumpadDivide: 'numdiv', NumpadDecimal: 'numdec',
+      ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Space: 'Space', Tab: 'Tab',
+      Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', Insert: 'Insert', Delete: 'Delete',
+    };
+    key = map[c] || null;
+  }
+  return { mods, key };
+}
+
+async function stopRecording() {
+  recording = null;
+  await api.invoke('hotkeys:suspend', false);
+  render();
+}
+
+function onKeyRecord(e) {
+  if (!recording) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.key === 'Escape') return stopRecording();
+  if (['Control', 'Shift', 'Alt', 'Meta', 'AltGraph'].includes(e.key)) return;
+  const { mods, key } = accelFromEvent(e);
+  if (!key) return showToast({ text: 'Touche non prise en charge : choisis une lettre, un chiffre ou une touche F.', level: 'warn' });
+  if (!mods.length) return showToast({ text: 'Ajoute Ctrl, Alt, Maj ou Win pour ne pas gêner le jeu.', level: 'warn' });
+  const name = recording;
+  recording = null;
+  api.invoke('hotkeys:set', { name, accel: [...mods, key].join('+') }).then(async (r) => {
+    state = r.state;
+    await api.invoke('hotkeys:suspend', false);
+    render();
+    showToast({ text: r.error || 'Raccourci enregistré.', level: r.error ? 'warn' : 'ok' });
+  });
+}
+
 function render() {
   const s = state;
   if (!s) return;
@@ -891,6 +1153,7 @@ function render() {
   renderSettingsExtras(s);
   renderUpdate(s);
   renderAppearance(s);
+  renderFollowed(s);
   renderLive(s);
   if (!$('#page-champs').hidden) renderRolePrefs();
   $('#roleKey').textContent = s.hotkeys.role || '—';
@@ -929,20 +1192,38 @@ function render() {
   }
   $('#moveBtn').textContent = s.overlay.moveMode ? 'Valider la position' : "Déplacer l'overlay";
   const rows = [
-    ["Afficher / masquer l'overlay", s.hotkeys.toggle],
-    ["Déplacer l'overlay", s.hotkeys.move],
-    ['Mode compact', s.hotkeys.compact],
-    ['Appliquer les runes (pendant la sélection)', s.hotkeys.importRunes],
-    ['Changer de poste (sélection et partie)', s.hotkeys.role],
+    ['toggle', "Afficher / masquer l'overlay"],
+    ['move', "Déplacer l'overlay"],
+    ['compact', 'Mode compact'],
+    ['importRunes', 'Appliquer les runes (pendant la sélection)'],
+    ['role', 'Changer de poste (sélection et partie)'],
   ];
   $('#keys').replaceChildren(
-    ...rows.map(([lbl, key]) => {
-      const tr = el('tr');
-      const td = el('td');
-      td.append(el('kbd', '', key));
-      tr.append(el('td', '', lbl), td);
-      return tr;
-    }),
+    ...rows.map(([name, lbl]) =>
+      h(
+        'tr',
+        { class: recording === name ? 'rec' : '' },
+        h('td', null, lbl),
+        h('td', null, recording === name ? h('kbd', { class: 'live' }, 'Appuie sur ta combinaison…') : s.hotkeys[name] ? h('kbd', null, s.hotkeys[name]) : h('span', { class: 'muted' }, 'aucun')),
+        h(
+          'td',
+          { class: 'act' },
+          h(
+            'button',
+            {
+              class: 'btn ghost small',
+              onclick: async () => {
+                if (recording === name) return stopRecording();
+                recording = name;
+                await api.invoke('hotkeys:suspend', true);
+                render();
+              },
+            },
+            recording === name ? 'Annuler' : 'Modifier',
+          ),
+        ),
+      ),
+    ),
   );
   setMsg('#hotkeyErrors', s.hotkeyErrors.join(' · '), 'warn');
 
@@ -1051,6 +1332,24 @@ function bind() {
   });
   $('#language').addEventListener('change', (e) => saveConfig({ language: e.target.value }));
   for (const b of $$('#themeSeg button')) b.addEventListener('click', () => saveConfig({ appearance: { theme: b.dataset.theme } }));
+  document.addEventListener('keydown', onKeyRecord, true);
+  $('#keysReset').addEventListener('click', async () => {
+    state = await api.invoke('hotkeys:reset');
+    render();
+    showToast({ text: 'Raccourcis par défaut rétablis.', level: 'ok' });
+  });
+  $('#bChamp').addEventListener('change', (e) => {
+    bSel.champKey = Number(e.target.value) || 0;
+    refreshBuilds();
+  });
+  $('#fAdd').addEventListener('click', async () => {
+    const r = await api.invoke('follow:add', { name: $('#fName').value, platform: $('#fPlatform').value });
+    if (r.error) return setMsg('#fMsg', r.error, 'warn');
+    setMsg('#fMsg', 'Joueur suivi : ses parties arrivent avec la collecte.', 'ok');
+    $('#fName').value = '';
+    state = r.state;
+    render();
+  });
   $('#autoUpdate').addEventListener('change', (e) => saveConfig({ autoUpdate: e.target.checked }));
   $('#updCheck').addEventListener('click', async () => {
     $('#updStatus').textContent = 'Recherche d’une nouvelle version…';

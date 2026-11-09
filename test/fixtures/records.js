@@ -214,6 +214,31 @@ function ahriSupportRecords(n = 4, seed = 17) {
   return out;
 }
 
+/** Fiches meta légères : 5 paliers, 10 joueurs par partie, champions de la fixture. */
+function metaRecords(matches = 60, seed = 21) {
+  const rnd = lcg(seed);
+  const byRole = {
+    TOP: [K.Aatrox, K.Darius, K.Ornn, K.Yasuo],
+    JUNGLE: [K.Sejuani, K.LeeSin, K.Viego],
+    MIDDLE: [K.Ahri, K.Zed, K.Syndra, K.Orianna, K.Yasuo],
+    BOTTOM: [K.Jinx, K.Kaisa, K.Ezreal],
+    UTILITY: [K.Soraka, K.Leona, K.Lulu, K.Thresh],
+  };
+  const out = [];
+  for (const t of ['low', 'emerald', 'diamond', 'master']) {
+    for (let i = 0; i < matches; i++) {
+      const m = `META_${t}_${i}`;
+      for (const team of [0, 1]) {
+        for (const [r, list] of Object.entries(byRole)) {
+          const c = list[Math.floor(rnd() * list.length)];
+          out.push({ m, v: '16.21', q: 'sr', t, c, r, w: team === (rnd() < 0.5 ? 0 : 1) ? 1 : 0, lt: 1 });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** Fiches minimales pour d'autres champions (sert à connaître leur rôle habituel). */
 function roleRecords(seed = 3) {
   const rnd = lcg(seed);
@@ -232,4 +257,4 @@ function roleRecords(seed = 3) {
   return out;
 }
 
-module.exports = { ahriRecords, aramAhriRecords, arenaAhriRecords, supportRecords, ahriSupportRecords, roleRecords, K, PAGES };
+module.exports = { metaRecords, ahriRecords, aramAhriRecords, arenaAhriRecords, supportRecords, ahriSupportRecords, roleRecords, K, PAGES };

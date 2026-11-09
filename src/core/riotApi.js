@@ -83,8 +83,9 @@ class RiotApi {
     return `https://${this.getPlatform()}.api.riotgames.com`;
   }
 
-  regionalHost() {
-    return `https://${REGIONAL[this.getPlatform()] || 'europe'}.api.riotgames.com`;
+  /** platform : serveur d'un joueur suivi (ex. 'kr' pour Faker), sinon celui des réglages. */
+  regionalHost(platform = null) {
+    return `https://${REGIONAL[platform || this.getPlatform()] || 'europe'}.api.riotgames.com`;
   }
 
   async request(url, { retries = 3 } = {}) {
@@ -151,19 +152,31 @@ class RiotApi {
     );
   }
 
-  matchIds(puuid, { count = 20, startTime = null, queue = 420 } = {}) {
+  /** Compte Riot (pseudo#tag) -> puuid. */
+  accountByRiotId(gameName, tagLine, platform = null) {
+    return this.request(
+      `${this.regionalHost(platform)}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    );
+  }
+
+  /** Joueurs d'un palier classé (IRON..DIAMOND, divisions I à IV), 205 par page. */
+  leagueEntries(tier, division, page = 1) {
+    return this.request(`${this.platformHost()}/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`);
+  }
+
+  matchIds(puuid, { count = 20, startTime = null, queue = 420, platform = null } = {}) {
     // pas de filtre "type" : la file suffit (ranked, normal ARAM, Arena...)
     const q = new URLSearchParams({ queue: String(queue), start: '0', count: String(count) });
     if (startTime) q.set('startTime', String(startTime));
-    return this.request(`${this.regionalHost()}/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?${q}`);
+    return this.request(`${this.regionalHost(platform)}/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?${q}`);
   }
 
-  match(id) {
-    return this.request(`${this.regionalHost()}/lol/match/v5/matches/${encodeURIComponent(id)}`);
+  match(id, platform = null) {
+    return this.request(`${this.regionalHost(platform)}/lol/match/v5/matches/${encodeURIComponent(id)}`);
   }
 
-  timeline(id) {
-    return this.request(`${this.regionalHost()}/lol/match/v5/matches/${encodeURIComponent(id)}/timeline`);
+  timeline(id, platform = null) {
+    return this.request(`${this.regionalHost(platform)}/lol/match/v5/matches/${encodeURIComponent(id)}/timeline`);
   }
 }
 

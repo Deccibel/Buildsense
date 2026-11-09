@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, screen, shell, protocol, net, nativeTheme } = require('electron');
 
-const { Config } = require('./core/config');
+const { Config, DEFAULTS } = require('./core/config');
 const { DDragon, DD_LANGUAGES, ddLanguage } = require('./core/ddragon');
 const { Store } = require('./core/store');
 const { RiotApi, PLATFORMS } = require('./core/riotApi');
@@ -18,6 +18,7 @@ const { ROLE_LABELS } = require('./core/util');
 const { IconCache, DEFAULT_REMOTE } = require('./core/iconCache');
 const { detectMode, FAMILY_IDS } = require('./core/modes');
 const { Updater, compareVersions } = require('./core/updater');
+const { buildsView: pageBuilds, metaView: pageMeta } = require('./core/pageViews');
 const { spawn } = require('child_process');
 
 const OVERLAY_WIDTH = 340;
@@ -116,6 +117,11 @@ async function init() {
     getActiveFamily: () => S.activeFamily,
   });
   S.crawler.on('status', () => pushStateSoon());
+  S.followStatus = {};
+  S.crawler.on('followed', ({ id, found }) => {
+    S.followStatus[id] = found;
+    pushStateSoon();
+  });
   S.store.on('change', () => pushStateSoon());
   S.lcu = new LcuClient({ getLeaguePath: () => S.config.get('leaguePath') });
   setupIcons(userData);
@@ -613,7 +619,16 @@ function onGameStart() {
 }
 
 function computeLive(game, mode) {
-  return computeIngame({ dd: S.dd, store: S.store, rec: S.rec, game, hasKey: !!S.config.get('apiKey'), mode, roleChoice: roleChoice() });
+  return computeIngame({
+    dd: S.dd,
+    store: S.store,
+    rec: S.rec,
+    game,
+    hasKey: !!S.config.get('apiKey'),
+    mode,
+    roleChoice: roleChoice(),
+    presets: S.config.get('buildPresets'),
+  });
 }
 
 function computeCs(cs) {
@@ -625,6 +640,7 @@ function computeCs(cs) {
     hasKey: !!S.config.get('apiKey'),
     importHotkey: S.config.get('hotkeys').importRunes,
     roleChoice: roleChoice(),
+    presets: S.config.get('buildPresets'),
   });
 }
 
@@ -961,6 +977,38 @@ async function importRunes() {
   return r;
 }
 
+// ---------------------------------------------------------------- raccourcis modifiables
+
+const HOTKEY_NAMES = ['toggle', 'move', 'compact', 'importRunes', 'role'];
+const MOD = '(?:CommandOrControl|Alt|Shift|Super)';
+const KEY = '(?:[A-Z0-9]|F(?:[1-9]|1\\d|2[0-4])|num[0-9]|numadd|numsub|nummult|numdiv|numdec|Up|Down|Left|Right|Space|Tab|Home|End|PageUp|PageDown|Insert|Delete)';
+// au moins un modificateur : une touche seule gênerait le jeu (et le chat)
+const ACCEL_RE = new RegExp(`^${MOD}(?:\\+${MOD})*\\+${KEY}$`);
+
+/** Change un raccourci ; renvoie un message d'erreur ou null. */
+function setHotkey(name, accel) {
+  if (!HOTKEY_NAMES.includes(name)) return 'Raccourci inconnu.';
+  const hk = S.config.get('hotkeys');
+  if (accel === '') {
+    S.config.set({ hotkeys: { [name]: '' } });
+    registerHotkeys();
+    return null;
+  }
+  if (typeof accel !== 'string' || !ACCEL_RE.test(accel)) return 'Combinaison non prise en charge : utilise Ctrl, Alt, Maj ou Win + une lettre, un chiffre ou une touche F.';
+  const dup = HOTKEY_NAMES.find((n) => n !== name && hk[n] === accel);
+  if (dup) return `${hotkeyLabel(accel)} est déjà utilisé par un autre raccourci de BuildSense.`;
+  const prev = hk[name];
+  S.config.set({ hotkeys: { [name]: accel } });
+  registerHotkeys();
+  if (S.hotkeyErrors.some((e) => e.includes(hotkeyLabel(accel)))) {
+    S.config.set({ hotkeys: { [name]: prev } });
+    registerHotkeys();
+    return `${hotkeyLabel(accel)} est déjà pris par Windows ou une autre appli.`;
+  }
+  pushOverlaySettings();
+  return null;
+}
+
 function registerHotkeys() {
   globalShortcut.unregisterAll();
   S.hotkeyErrors = [];
@@ -990,6 +1038,15 @@ function registerHotkeys() {
 
 // ---------------------------------------------------------------- état pour la fenêtre principale
 
+function buildsView(champKey, role) {
+  if (!S.dd.ready) return null;
+  return pageBuilds({ dd: S.dd, rec: S.rec, followed: S.config.get('followed'), presets: S.config.get('buildPresets') }, champKey, role);
+}
+
+function metaView(tier) {
+  return S.dd.ready ? pageMeta({ dd: S.dd, store: S.store }, tier) : null;
+}
+
 function fullState() {
   const cfg = S.config.get();
   return {
@@ -1013,6 +1070,7 @@ function fullState() {
       role: currentRoleInfo(),
     },
     live: liveView(),
+    followed: (cfg.followed || []).map((f) => ({ ...f, found: S.followStatus ? S.followStatus[f.id] : undefined })),
     version: PKG.version,
     update: S.updater
       ? {
@@ -1075,7 +1133,7 @@ function sanitizeConfig(patch) {
   }
   if (patch.collectModes && typeof patch.collectModes === 'object') {
     out.collectModes = {};
-    for (const f of FAMILY_IDS) if (typeof patch.collectModes[f] === 'boolean') out.collectModes[f] = patch.collectModes[f];
+    for (const f of [...FAMILY_IDS, 'meta']) if (typeof patch.collectModes[f] === 'boolean') out.collectModes[f] = patch.collectModes[f];
   }
   if (patch.overlay && typeof patch.overlay === 'object') {
     const o = {};
@@ -1165,6 +1223,57 @@ function registerIpc() {
   });
 
   ipcMain.handle('runes:import', () => importRunes());
+
+  ipcMain.handle('hotkeys:set', (_e, { name, accel } = {}) => {
+    const error = setHotkey(name, accel);
+    return { error, state: fullState() };
+  });
+  ipcMain.handle('hotkeys:reset', () => {
+    S.config.set({ hotkeys: { ...DEFAULTS.hotkeys } });
+    registerHotkeys();
+    pushOverlaySettings();
+    return fullState();
+  });
+  // pendant l'enregistrement d'une combinaison, les raccourcis actuels ne doivent pas se déclencher
+  ipcMain.handle('hotkeys:suspend', (_e, on) => {
+    if (on) globalShortcut.unregisterAll();
+    else registerHotkeys();
+    return true;
+  });
+
+  ipcMain.handle('builds:get', (_e, { champKey, role } = {}) => buildsView(Number(champKey), normRole(role)));
+  ipcMain.handle('builds:favorite', (_e, { champKey, role, items, label } = {}) => {
+    const key = `${Number(champKey)}|${normRole(role)}`;
+    const ok = Array.isArray(items) && items.length && items.every((x) => Number.isInteger(x) && S.dd.item(x));
+    if (Number(champKey) > 0 && ok) S.config.set({ buildPresets: { [key]: { items: items.slice(0, 5), label: String(label || 'ton build').slice(0, 60) } } });
+    recomputeViews();
+    return buildsView(Number(champKey), normRole(role));
+  });
+  ipcMain.handle('builds:unfavorite', (_e, { champKey, role } = {}) => {
+    const presets = { ...S.config.get('buildPresets') };
+    delete presets[`${Number(champKey)}|${normRole(role)}`];
+    S.config.data.buildPresets = presets; // remplacement complet (la fusion ne supprime pas)
+    S.config.save();
+    recomputeViews();
+    return buildsView(Number(champKey), normRole(role));
+  });
+  ipcMain.handle('follow:add', (_e, { name, platform } = {}) => {
+    const n = String(name || '').trim();
+    if (!/^[^#]{3,16}#[A-Za-z0-9]{2,5}$/.test(n)) return { error: 'Format attendu : pseudo#tag (ex. Hide on bush#KR1)' };
+    const pf = PLATFORMS.includes(platform) ? platform : S.config.get('platform');
+    const list = S.config.get('followed') || [];
+    if (list.some((f) => f.name.toLowerCase() === n.toLowerCase())) return { error: 'Ce joueur est déjà suivi.' };
+    if (list.length >= 10) return { error: '10 joueurs suivis au maximum.' };
+    S.config.data.followed = [...list, { id: `f${Date.now().toString(36)}`, name: n, platform: pf }];
+    S.config.save();
+    return { state: fullState() };
+  });
+  ipcMain.handle('follow:remove', (_e, id) => {
+    S.config.data.followed = (S.config.get('followed') || []).filter((f) => f.id !== id);
+    S.config.save();
+    return { state: fullState() };
+  });
+  ipcMain.handle('meta:get', (_e, tier) => metaView(String(tier || 'gm')));
 
   ipcMain.handle('role:set', (_e, role) => {
     setRole(typeof role === 'string' ? role : '', { announce: false });

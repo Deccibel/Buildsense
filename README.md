@@ -12,7 +12,8 @@ Overlay de builds pour League of Legends. Il récupère les builds des meilleurs
 
 1. **Clé API Riot** (Réglages) : copie ta *Development API Key* depuis [developer.riotgames.com](https://developer.riotgames.com), colle-la, puis clique sur **Enregistrer**. Elle expire toutes les 24 h, mais tu peux demander une *Personal API Key* qui, elle, n'expire pas.
 2. **Mes champions** : choisis tes champions, ils sont collectés en priorité. Tu peux aussi indiquer ton poste préféré pour chacun, par exemple Shen → Support.
-3. **Dans LoL** : Options › Vidéo › **Fenêtré sans bordure**.
+3. **Builds** (facultatif) : mets un build en favori pour un champion et un poste. Il sert de point de départ en partie. Tu peux aussi suivre un joueur (ex. Hide on bush#KR1) pour reprendre ses builds.
+4. **Dans LoL** : Options › Vidéo › **Fenêtré sans bordure**.
 
 ## Modes de jeu
 
@@ -32,10 +33,13 @@ Dès que tu verrouilles ton champion, la page conseillée (selon ton champion, t
 
 - **Sélection** : adversaires, runes, sorts, départ, build type, ordre des compétences.
 - **Début de partie** : les départs possibles, le meilleur encadré « ★ Meilleur choix ». Dans la boutique, la page d'objets « BuildSense » (onglet Recommandés) suit le même ordre.
-- **En partie** : équipe adverse (KDA, *fed*, type de dégâts), prochain objet avec ses raisons, achat possible avec ton or, bottes, alertes, build type.
+- **En partie** : équipe adverse (KDA, *fed*, type de dégâts), prochain objet avec ses raisons, achat possible avec ton or, alertes, et le build complet de 6 objets adapté à la partie.
+- L'onglet **Meta** de l'appli donne le top 5 des champions par poste et par élo.
 - La page **En direct** de l'appli affiche la même chose en grand, pour un second écran.
 
 ## Raccourcis
+
+Tu peux les changer dans l'onglet Overlay (n'importe quelle disposition de clavier).
 
 | Action | Raccourci |
 |---|---|

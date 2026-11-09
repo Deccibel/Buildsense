@@ -1,7 +1,7 @@
 {
   "name": "buildsense",
   "productName": "BuildSense",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Overlay de builds pour League of Legends basé sur les parties des meilleurs joueurs (API officielles Riot uniquement).",
   "author": "BuildSense",
   "main": "src/main.js",

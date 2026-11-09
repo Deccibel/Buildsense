@@ -28,6 +28,14 @@
           <span class="nav-label">En direct</span>
           <span class="live-dot" id="liveDot" hidden></span>
         </button>
+        <button class="nav" data-page="builds">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></svg>
+          Builds
+        </button>
+        <button class="nav" data-page="meta">
+          <svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6" /></svg>
+          Meta
+        </button>
         <button class="nav" data-page="champs">
           <svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" /></svg>
           Mes champions
@@ -111,6 +119,43 @@
         </label>
       </section>
 
+      <!-- ============ BUILDS ============ -->
+      <section class="page" id="page-builds" hidden>
+        <header class="page-head">
+          <h1>Builds</h1>
+          <p>Choisis un champion et un poste, puis mets un build en favori : il devient ton point de départ en partie. BuildSense l'adapte toujours à la compo adverse.</p>
+        </header>
+        <div class="toolbar">
+          <select id="bChamp" class="search"></select>
+          <div class="seg" id="bRole"></div>
+        </div>
+        <div id="bView"></div>
+        <div class="card" id="followBox">
+          <h3>Joueurs suivis</h3>
+          <p class="muted">Leurs parties classées sont collectées en priorité, et leurs builds apparaissent ci-dessus (« Comme … »). Par exemple Faker : <b>Hide on bush#KR1</b>, serveur KR.</p>
+          <div class="inline wrap">
+            <input id="fName" placeholder="pseudo#tag" spellcheck="false" autocomplete="off" />
+            <select id="fPlatform"></select>
+            <button id="fAdd" class="btn small">Suivre</button>
+          </div>
+          <div class="msg" id="fMsg"></div>
+          <div class="preflist" id="fList"></div>
+        </div>
+      </section>
+
+      <!-- ============ META ============ -->
+      <section class="page" id="page-meta" hidden>
+        <header class="page-head">
+          <h1>Meta</h1>
+          <p>Les 5 champions les plus forts par poste, en classée solo/duo, selon ton niveau.</p>
+        </header>
+        <div class="toolbar">
+          <div class="seg" id="mTier"></div>
+          <div class="seg" id="mSort"></div>
+        </div>
+        <div id="mView"></div>
+      </section>
+
       <!-- ============ CHAMPIONS ============ -->
       <section class="page" id="page-champs" hidden>
         <header class="page-head">
@@ -181,8 +226,10 @@
         </div>
         <div class="card">
           <h3>Raccourcis clavier</h3>
+          <p class="muted small">Clique sur « Modifier », puis appuie sur la combinaison voulue (Ctrl, Alt, Maj ou Win + une touche). Marche avec toutes les dispositions de clavier (AZERTY, QWERTY…). Échap pour annuler.</p>
           <table class="keys" id="keys"></table>
           <div id="hotkeyErrors" class="msg warn"></div>
+          <div class="btns"><button class="btn ghost small" id="keysReset">Raccourcis par défaut</button></div>
         </div>
       </section>
 

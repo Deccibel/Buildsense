@@ -2,6 +2,14 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 1.6.0
+
+- Overlay : build complet de 6 objets (bottes + 5 objets), adapté à la partie, objets de situation signalés.
+- Nouvel onglet Builds : les builds d'un champion par poste, à mettre en favori comme point de départ (l'adaptation à la partie reste active).
+- Joueurs suivis : ajoute un joueur par son Riot ID (ex. Hide on bush#KR1) pour voir et copier ses builds.
+- Nouvel onglet Meta : top 5 des champions par poste, par % de pick ou % de victoire, de Platine et moins jusqu'à GM et plus.
+- Raccourcis modifiables (onglet Overlay), quelle que soit la disposition du clavier.
+
 ## 1.5.0
 
 - Début de partie : l'overlay montre les départs possibles, le meilleur encadré avec la bulle « ★ Meilleur choix ».

@@ -189,6 +189,14 @@ ipcMain.handle('config:set', () => dashState);
 ipcMain.handle('role:set', () => dashState);
 ipcMain.handle('demo:set', () => dashState);
 ipcMain.handle('runes:import', () => ({ ok: true, message: 'Aperçu : rien à importer.' }));
+const { buildsView, metaView } = require('../src/core/pageViews');
+let pageData = null;
+ipcMain.handle('builds:get', (_e, { champKey, role } = {}) =>
+  pageData ? buildsView({ dd: pageData.dd, rec: pageData.rec, followed: dashState.config.followed, presets: dashState.config.buildPresets }, Number(champKey) || 103, role || '') : null,
+);
+for (const ch of ['builds:favorite', 'builds:unfavorite']) ipcMain.handle(ch, () => null);
+ipcMain.handle('meta:get', (_e, tier) => (pageData ? metaView({ dd: pageData.dd, store: pageData.store }, tier || 'gm') : null));
+for (const ch of ['hotkeys:suspend']) ipcMain.handle(ch, () => true);
 for (const ch of ['update:check', 'update:download', 'update:dismiss', 'whatsnew:dismiss']) ipcMain.handle(ch, () => dashState);
 ipcMain.handle('update:install', () => ({ ok: true, message: 'Aperçu : rien à installer.' }));
 ipcMain.handle('champions:list', () => dashChamps);
@@ -246,6 +254,7 @@ async function checkDashboardPage(win, name) {
 // ------------------------------------------------------------------ scénarios
 
 function dashboardScenarios(data) {
+  pageData = data;
   const vms = S.overlayVms(data);
   const pref = { [String(103)]: 'UTILITY', [String(238)]: 'JUNGLE' };
   return {
@@ -264,6 +273,8 @@ function dashboardScenarios(data) {
     'direct-selection-aram': { page: 'live', state: S.dashboardState(data, { live: { source: 'champselect', vm: vms['selection-aram'] }, phase: 'ChampSelect' }) },
     'direct-vide': { page: 'live', state: S.dashboardState(data, {}) },
     champions: { page: 'champs', state: S.dashboardState(data, { rolePrefs: pref }) },
+    builds: { page: 'builds', state: S.dashboardState(data, {}) },
+    meta: { page: 'meta', state: S.dashboardState(data, {}) },
     overlay: { page: 'overlay', state: S.dashboardState(data, {}) },
     reglages: { page: 'settings', state: S.dashboardState(data, {}) },
   };
@@ -297,6 +308,7 @@ const APPEARANCES = [
 ];
 
 function themedScenarios(data, appearance) {
+  pageData = data;
   const vms = S.overlayVms(data);
   return {
     accueil: { page: 'home', state: S.dashboardState(data, { appearance, update: 'ready' }) },
@@ -377,7 +389,7 @@ async function runShots() {
 
   const champs = S.championsList(data);
   const scen = dashboardScenarios(data);
-  for (const name of ['accueil-en-partie', 'accueil-maj-prete', 'accueil-maj-telechargement', 'direct-partie', 'direct-selection', 'direct-aram', 'champions', 'reglages']) {
+  for (const name of ['builds', 'meta', 'overlay', 'accueil-en-partie', 'accueil-maj-prete', 'accueil-maj-telechargement', 'direct-partie', 'direct-selection', 'direct-aram', 'champions', 'reglages']) {
     const w = await renderDashboard(scen[name].state, champs, scen[name].page, [1180, 860]);
     fs.writeFileSync(path.join(OUT, `fenetre-${name}.png`), (await w.webContents.capturePage()).toPNG());
   }

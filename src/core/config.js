@@ -16,10 +16,14 @@ const DEFAULTS = {
   language: 'auto',
   detectedLocale: null,
   // modes dont on collecte les builds
-  collectModes: { sr: true, aram: true, mayhem: true, arena: true },
+  collectModes: { sr: true, aram: true, mayhem: true, arena: true, meta: true },
   favorites: [], // championKeys (nombres) à collecter en priorité
   // poste préféré par champion, ex. { "98": "UTILITY" } pour Shen support ('' = automatique)
   rolePrefs: {},
+  // builds favoris (onglet Builds) : { "103|MIDDLE": { items: [ids], label } }
+  buildPresets: {},
+  // joueurs suivis (onglet Builds) : [{ id, name: 'pseudo#tag', platform }]
+  followed: [],
   // en sélection : applique la page de runes recommandée (remplace la page active)
   autoRunes: true,
   // en sélection : écrit une page d'objets BuildSense dans la boutique (meilleur départ en premier)
