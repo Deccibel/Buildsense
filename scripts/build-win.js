@@ -21,7 +21,7 @@ const isWin = process.platform === 'win32';
 
 function run(cmd, args, env = {}) {
   console.log(`> ${cmd} ${args.join(' ')}`);
-  execFileSync(cmd, args, { stdio: 'inherit', cwd: ROOT, env: { ...process.env, ...env }, shell: isWin });
+  execFileSync(cmd, args, { stdio: 'inherit', cwd: ROOT, env: { ...process.env, ...env } });
 }
 
 function findMakensis() {
@@ -42,8 +42,10 @@ fs.mkdirSync(DIST, { recursive: true });
 
 // 1. Appli Windows (BuildSense.exe + fichiers d'Electron)
 // L'appli n'a aucune dépendance à l'exécution : node_modules ne contient que les outils de dev.
-const ignore = '^/(node_modules|test|scripts|build|dist|preview|README\\.md|CHANGELOG\\.md|Lancer BuildSense\\.bat|\\.gitignore|package-lock\\.json)($|/)';
-run(path.join(ROOT, 'node_modules', '.bin', isWin ? 'electron-packager.cmd' : 'electron-packager'), [
+const ignore = '^/(node_modules|test|scripts|build|dist|preview|README\\.md|CHANGELOG\\.md|Lancer BuildSense\\.bat|\\.git\\w*|\\.github|package-lock\\.json)($|/)';
+// lancé directement avec node (pas de shell : sous Windows, cmd.exe casserait l'expression --ignore)
+run(process.execPath, [
+  path.join(ROOT, 'node_modules', '@electron', 'packager', 'bin', 'electron-packager.mjs'),
   '.',
   'BuildSense',
   '--platform=win32',
