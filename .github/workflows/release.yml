@@ -1,0 +1,75 @@
+# Publie automatiquement une version de BuildSense.
+# Déclenché quand package.json change sur main : si la version n'est pas encore publiée,
+# un Windows de GitHub lance les tests, construit l'installeur et crée la Release
+# (installeur + latest.json). Les applis installées la détectent ensuite toutes seules.
+name: Publier une version
+
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version à publier
+        id: v
+        shell: bash
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "La version $V est déjà publiée : rien à faire."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.v.outputs.publish == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dépendances
+        if: steps.v.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Tests
+        if: steps.v.outputs.publish == 'true'
+        run: npm test
+
+      - name: NSIS (installeur)
+        if: steps.v.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'C:\Program Files (x86)\NSIS\makensis.exe')) { choco install nsis -y --no-progress }
+
+      - name: Construction
+        if: steps.v.outputs.publish == 'true'
+        run: npm run dist:win
+
+      - name: Vérification de l'installeur
+        if: steps.v.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $f = "dist\BuildSense-Setup-${{ steps.v.outputs.version }}.exe"
+          if (-not (Test-Path $f)) { throw "Installeur introuvable : $f" }
+          "{0:N1} Mo" -f ((Get-Item $f).Length / 1MB)
+
+      - name: Publication
+        if: steps.v.outputs.publish == 'true'
+        run: node scripts/release.js

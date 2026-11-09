@@ -1,0 +1,79 @@
+{
+  "activePlayer": {
+    "currentGold": 1450.5,
+    "level": 11,
+    "riotId": "Toi#EUW",
+    "riotIdGameName": "Toi",
+    "riotIdTagLine": "EUW",
+    "summonerName": "Toi#EUW",
+    "teamRelativeColors": true
+  },
+  "allPlayers": [
+    {
+      "championName": "Ahri", "rawChampionName": "game_character_displayname_Ahri", "isBot": false, "isDead": false,
+      "level": 11, "position": "MIDDLE", "team": "ORDER",
+      "riotId": "Toi#EUW", "riotIdGameName": "Toi", "riotIdTagLine": "EUW", "summonerName": "Toi#EUW",
+      "scores": { "kills": 3, "deaths": 2, "assists": 4, "creepScore": 142, "wardScore": 8.5 },
+      "items": [
+        { "itemID": 6655, "slot": 0, "count": 1, "displayName": "Luden's Companion" },
+        { "itemID": 3020, "slot": 1, "count": 1, "displayName": "Sorcerer's Shoes" },
+        { "itemID": 1052, "slot": 2, "count": 1, "displayName": "Amplifying Tome" },
+        { "itemID": 1056, "slot": 3, "count": 1, "displayName": "Doran's Ring" },
+        { "itemID": 2003, "slot": 4, "count": 1, "displayName": "Health Potion" },
+        { "itemID": 3340, "slot": 6, "count": 1, "displayName": "Stealth Ward" }
+      ]
+    },
+    {
+      "championName": "Ornn", "rawChampionName": "game_character_displayname_Ornn", "level": 10, "position": "TOP", "team": "ORDER",
+      "riotId": "Allie1#EUW", "riotIdGameName": "Allie1", "riotIdTagLine": "EUW",
+      "scores": { "kills": 1, "deaths": 1, "assists": 5 }, "items": [{ "itemID": 3047, "slot": 0 }]
+    },
+    {
+      "championName": "Viego", "rawChampionName": "game_character_displayname_Viego", "level": 11, "position": "JUNGLE", "team": "ORDER",
+      "riotId": "Allie2#EUW", "riotIdGameName": "Allie2", "riotIdTagLine": "EUW",
+      "scores": { "kills": 4, "deaths": 3, "assists": 3 }, "items": [{ "itemID": 1037, "slot": 0 }]
+    },
+    {
+      "championName": "Kai'Sa", "rawChampionName": "game_character_displayname_Kaisa", "level": 10, "position": "BOTTOM", "team": "ORDER",
+      "riotId": "Allie3#EUW", "riotIdGameName": "Allie3", "riotIdTagLine": "EUW",
+      "scores": { "kills": 2, "deaths": 2, "assists": 2 }, "items": [{ "itemID": 6672, "slot": 0 }]
+    },
+    {
+      "championName": "Thresh", "rawChampionName": "game_character_displayname_Thresh", "level": 9, "position": "UTILITY", "team": "ORDER",
+      "riotId": "Allie4#EUW", "riotIdGameName": "Allie4", "riotIdTagLine": "EUW",
+      "scores": { "kills": 0, "deaths": 3, "assists": 7 }, "items": []
+    },
+    {
+      "championName": "Aatrox", "rawChampionName": "game_character_displayname_Aatrox", "level": 11, "position": "TOP", "team": "CHAOS",
+      "riotId": "Enemy1#EUW", "riotIdGameName": "Enemy1", "riotIdTagLine": "EUW",
+      "scores": { "kills": 2, "deaths": 1, "assists": 3 },
+      "items": [{ "itemID": 1037, "slot": 0 }, { "itemID": 3047, "slot": 1 }]
+    },
+    {
+      "championName": "Sejuani", "rawChampionName": "game_character_displayname_Sejuani", "level": 10, "position": "JUNGLE", "team": "CHAOS",
+      "riotId": "Enemy2#EUW", "riotIdGameName": "Enemy2", "riotIdTagLine": "EUW",
+      "scores": { "kills": 1, "deaths": 2, "assists": 6 },
+      "items": [{ "itemID": 3075, "slot": 0 }, { "itemID": 3111, "slot": 1 }]
+    },
+    {
+      "championName": "Zed", "rawChampionName": "game_character_displayname_Zed", "level": 12, "position": "MIDDLE", "team": "CHAOS",
+      "riotId": "Enemy3#EUW", "riotIdGameName": "Enemy3", "riotIdTagLine": "EUW",
+      "scores": { "kills": 7, "deaths": 1, "assists": 2 },
+      "items": [{ "itemID": 6695, "slot": 0 }, { "itemID": 3047, "slot": 1 }, { "itemID": 1037, "slot": 2 }]
+    },
+    {
+      "championName": "Jinx", "rawChampionName": "game_character_displayname_Jinx", "level": 10, "position": "BOTTOM", "team": "CHAOS",
+      "riotId": "Enemy4#EUW", "riotIdGameName": "Enemy4", "riotIdTagLine": "EUW",
+      "scores": { "kills": 3, "deaths": 2, "assists": 1 },
+      "items": [{ "itemID": 3031, "slot": 0 }, { "itemID": 3006, "slot": 1 }]
+    },
+    {
+      "championName": "Soraka", "rawChampionName": "game_character_displayname_Soraka", "level": 9, "position": "UTILITY", "team": "CHAOS",
+      "riotId": "Enemy5#EUW", "riotIdGameName": "Enemy5", "riotIdTagLine": "EUW",
+      "scores": { "kills": 0, "deaths": 1, "assists": 9 },
+      "items": [{ "itemID": 3111, "slot": 0 }]
+    }
+  ],
+  "events": { "Events": [{ "EventID": 0, "EventName": "GameStart", "EventTime": 0.03 }] },
+  "gameData": { "gameMode": "CLASSIC", "gameTime": 1122.4, "mapName": "Map11", "mapNumber": 11, "mapTerrain": "Default" }
+}

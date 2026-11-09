@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' bsicon: data:; style-src 'self'; script-src 'self'"
+    />
+    <title>BuildSense</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <aside class="side">
+      <div class="brand">
+        <img src="../../assets/icon.png" alt="" />
+        <div>
+          <b>BuildSense</b>
+          <span id="version">builds des meilleurs joueurs</span>
+        </div>
+      </div>
+      <nav>
+        <button class="nav active" data-page="home">
+          <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5" /></svg>
+          Accueil
+        </button>
+        <button class="nav" data-page="live">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6" /><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2" /></svg>
+          <span class="nav-label">En direct</span>
+          <span class="live-dot" id="liveDot" hidden></span>
+        </button>
+        <button class="nav" data-page="champs">
+          <svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" /></svg>
+          Mes champions
+        </button>
+        <button class="nav" data-page="overlay">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2" /><rect x="12.5" y="7" width="6" height="7" rx="1" /><path d="M8 21h8" /></svg>
+          Overlay
+        </button>
+        <button class="nav" data-page="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5" /></svg>
+          Réglages
+        </button>
+      </nav>
+      <div class="status" id="status"></div>
+    </aside>
+
+    <main>
+      <!-- ============ ACCUEIL ============ -->
+      <section class="page" id="page-home">
+        <header class="page-head">
+          <h1>Tableau de bord</h1>
+          <p>Les builds des meilleurs joueurs (Faille classée Chall/GM, ARAM, Arena…), adaptés à ta partie en direct.</p>
+        </header>
+
+        <div class="card update" id="updateCard" hidden></div>
+        <div class="card whatsnew" id="whatsNew" hidden></div>
+
+        <div class="card setup" id="setup"></div>
+
+        <button class="card livebanner" id="liveBanner" data-goto="live" hidden></button>
+
+        <div class="stats">
+          <div class="stat"><span>Parties collectées</span><b id="stMatches">0</b></div>
+          <div class="stat"><span>Builds analysés</span><b id="stRecords">0</b></div>
+          <div class="stat"><span>Dernier patch</span><b id="stPatch">–</b></div>
+          <div class="stat"><span>Requêtes (session)</span><b id="stRequests">0</b></div>
+        </div>
+        <div class="modestats" id="modeStats"></div>
+
+        <div class="card collect">
+          <div class="collect-main">
+            <span class="pulse" id="collectDot"></span>
+            <div>
+              <div class="collect-title" id="collectTitle">Collecte en pause</div>
+              <div class="collect-sub" id="collectSub"></div>
+            </div>
+          </div>
+          <button id="crawlerToggle" class="btn">Lancer la collecte</button>
+        </div>
+
+        <div class="section-title">
+          <h2>Mes champions</h2>
+          <button class="link" data-goto="champs">Gérer →</button>
+        </div>
+        <div class="favgrid" id="favTiles"></div>
+
+        <div class="section-title">
+          <h2>Tester l'overlay</h2>
+        </div>
+        <div class="card row-actions">
+          <p class="muted">Affiche l'overlay avec une partie de démonstration pour le placer et le régler.</p>
+          <div class="btns">
+            <button class="btn ghost" data-demo="ingame">Aperçu en partie</button>
+            <button class="btn ghost" data-demo="aram">Aperçu ARAM</button>
+            <button class="btn ghost" data-demo="champselect">Aperçu sélection</button>
+            <button class="btn ghost" data-demo="off">Fermer l'aperçu</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ EN DIRECT ============ -->
+      <section class="page" id="page-live" hidden>
+        <header class="page-head">
+          <h1>En direct</h1>
+          <p>Ta sélection et ta partie en temps réel : pratique sur un second écran. L'overlay reste affiché par-dessus le jeu.</p>
+        </header>
+        <div id="liveView"></div>
+        <label class="switch-row card slim">
+          <span><b>Ouvrir cette page au début de chaque partie</b><small>Sans prendre le focus : ton jeu reste au premier plan</small></span>
+          <span class="switch"><input type="checkbox" id="autoLivePage" /><i></i></span>
+        </label>
+      </section>
+
+      <!-- ============ CHAMPIONS ============ -->
+      <section class="page" id="page-champs" hidden>
+        <header class="page-head">
+          <h1>Mes champions</h1>
+          <p>Clique sur un champion pour l'ajouter à tes favoris : ses builds sont collectés en priorité, auprès des joueurs qui le maîtrisent.</p>
+        </header>
+        <div class="card roleprefs" id="rolePrefs">
+          <h3>Postes préférés</h3>
+          <p class="muted">
+            Tu joues un champion à un poste inhabituel (Shen support, Akali support…) ? Indique-le : quand le client ne donne pas ton poste
+            (partie normale à l'aveugle, modes spéciaux), BuildSense utilise celui-ci. Pendant une partie, tu peux aussi changer de poste avec
+            <kbd id="roleKey">Ctrl+Maj+P</kbd> ou depuis la page En direct.
+          </p>
+          <div class="inline wrap">
+            <select id="prefChamp"></select>
+            <select id="prefRole"></select>
+            <button id="prefAdd" class="btn small">Enregistrer</button>
+          </div>
+          <div class="preflist" id="prefList"></div>
+        </div>
+
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+            <input id="champSearch" placeholder="Rechercher un champion…" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="seg">
+            <button class="active" data-filter="all">Tous</button>
+            <button data-filter="fav">Favoris</button>
+          </div>
+        </div>
+        <div class="champgrid" id="champGrid"></div>
+
+      </section>
+
+      <!-- ============ OVERLAY ============ -->
+      <section class="page" id="page-overlay" hidden>
+        <header class="page-head">
+          <h1>Overlay</h1>
+          <p>Il s'affiche tout seul pendant la sélection des champions et en partie. Les clics passent au travers, vers le jeu.</p>
+        </header>
+        <div class="callout">
+          Mets LoL en <b>Fenêtré sans bordure</b> (Options › Vidéo › Mode fenêtre). En plein écran, rien ne peut s'afficher par-dessus le jeu.
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <h3>Aperçu et position</h3>
+            <div class="btns">
+              <button class="btn ghost" data-demo="ingame">Aperçu en partie</button>
+              <button class="btn ghost" data-demo="aram">Aperçu ARAM</button>
+              <button class="btn ghost" data-demo="champselect">Aperçu sélection</button>
+              <button class="btn ghost" data-demo="off">Fermer l'aperçu</button>
+            </div>
+            <div class="btns">
+              <button class="btn" id="moveBtn">Déplacer l'overlay</button>
+              <button class="btn ghost" id="resetPos">Position par défaut</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Apparence</h3>
+            <label class="slider"><span>Opacité</span><input type="range" id="opacity" min="0.4" max="1" step="0.02" /></label>
+            <label class="slider"><span>Taille</span><input type="range" id="scale" min="0.8" max="1.4" step="0.05" /></label>
+            <label class="switch-row">
+              <span><b>Mode compact</b><small>Juste le prochain objet et l'achat possible</small></span>
+              <span class="switch"><input type="checkbox" id="compact" /><i></i></span>
+            </label>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Raccourcis clavier</h3>
+          <table class="keys" id="keys"></table>
+          <div id="hotkeyErrors" class="msg warn"></div>
+        </div>
+      </section>
+
+      <!-- ============ RÉGLAGES ============ -->
+      <section class="page" id="page-settings" hidden>
+        <header class="page-head">
+          <h1>Réglages</h1>
+          <p>Clé API, serveur, modes collectés, langue, sélection des champions.</p>
+        </header>
+        <div class="grid2">
+          <div class="card">
+            <h3>Clé API Riot</h3>
+            <p class="muted">Gratuite, sur le portail développeur de Riot. Elle sert à récupérer les parties des meilleurs joueurs.</p>
+            <label class="field">
+              <span>Clé</span>
+              <div class="inline">
+                <input id="apiKey" type="password" placeholder="RGAPI-…" autocomplete="off" spellcheck="false" />
+                <button id="toggleKey" class="btn ghost small">Afficher</button>
+              </div>
+            </label>
+            <label class="field">
+              <span>Serveur</span>
+              <select id="platform"></select>
+            </label>
+            <div class="btns">
+              <button id="saveKey" class="btn">Enregistrer</button>
+              <button id="testKey" class="btn ghost">Tester la clé</button>
+              <button id="openPortal" class="link">Obtenir une clé ↗</button>
+            </div>
+            <div id="keyMsg" class="msg"></div>
+            <p class="muted small">
+              Une clé de développement expire toutes les 24 h. Pour ne plus avoir à la recoller, demande une « Personal API Key » sur le même
+              portail.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>Collecte</h3>
+            <label class="switch-row">
+              <span><b>Pause pendant mes parties</b><small>Aucune requête vers Riot tant que tu joues</small></span>
+              <span class="switch"><input type="checkbox" id="pauseInGame" /><i></i></span>
+            </label>
+            <div class="modes" id="collectModes"></div>
+            <p class="muted small">
+              Chaque partie récupérée donne un build par joueur. Le mode auquel tu joues est collecté en priorité. Seuls les 3 derniers patchs sont
+              gardés.
+            </p>
+            <h3 class="mt">Langue des noms</h3>
+            <label class="field">
+              <span>Objets, champions et runes</span>
+              <select id="language"></select>
+            </label>
+            <h3 class="mt">Sélection des champions</h3>
+            <label class="switch-row">
+              <span><b>Runes et sorts en sélection</b><small>Lit ta sélection dans le client LoL</small></span>
+              <span class="switch"><input type="checkbox" id="lcuEnabled" /><i></i></span>
+            </label>
+            <label class="switch-row">
+              <span><b>Runes automatiques</b><small>Dès que tu verrouilles ton champion, la page conseillée (selon ton poste et le mode) remplace ta page active</small></span>
+              <span class="switch"><input type="checkbox" id="autoRunes" /><i></i></span>
+            </label>
+            <label class="field">
+              <span>Dossier de League of Legends</span>
+              <div class="inline">
+                <input id="leaguePath" spellcheck="false" />
+                <button id="savePath" class="btn ghost small">OK</button>
+              </div>
+            </label>
+            <div class="btns">
+              <button id="importRunes" class="btn">Appliquer les runes maintenant</button>
+            </div>
+            <div id="csMsg" class="msg"></div>
+          </div>
+        </div>
+
+        <div class="card" id="updatesBox">
+          <h3>Mises à jour</h3>
+          <p class="muted" id="updStatus"></p>
+          <div class="upd-progress" id="updProgress" hidden><span></span></div>
+          <div class="btns">
+            <button id="updCheck" class="btn ghost">Vérifier maintenant</button>
+            <button id="updDownload" class="btn" hidden>Télécharger</button>
+            <button id="updInstall" class="btn" hidden>Redémarrer et mettre à jour</button>
+          </div>
+          <label class="field">
+            <span>Dépôt GitHub des versions</span>
+            <div class="inline">
+              <input id="updRepo" placeholder="pseudo/buildsense" spellcheck="false" autocomplete="off" />
+              <button id="updRepoSave" class="btn ghost small">OK</button>
+            </div>
+          </label>
+          <label class="switch-row">
+            <span><b>Télécharger les mises à jour automatiquement</b><small>En fond, jamais pendant une sélection ou une partie. L'installation se fait sur ton clic.</small></span>
+            <span class="switch"><input type="checkbox" id="autoUpdate" /><i></i></span>
+          </label>
+        </div>
+
+        <div class="card rules">
+          <h3>Ce que l'outil fait (et ne fait pas)</h3>
+          <ul>
+            <li>Uniquement les API officielles de Riot : aucune lecture de la mémoire du jeu, aucune injection.</li>
+            <li>Seulement des infos visibles en jeu (champions, objets, KDA) : pas de timers d'ultis, de sorts ou de camps.</li>
+            <li>Plusieurs options proposées : c'est toi qui achètes, rien n'est automatisé en partie (seule ta page de runes est réglée, en sélection).</li>
+            <li>Aucune recherche sur les joueurs de ta partie.</li>
+          </ul>
+        </div>
+      </section>
+
+      <footer class="legal">
+        BuildSense n'est pas approuvé par Riot Games et ne reflète pas les opinions de Riot Games ni de quiconque officiellement impliqué dans la
+        production ou la gestion des propriétés de Riot Games. Riot Games et toutes les propriétés associées sont des marques commerciales ou des
+        marques déposées de Riot Games, Inc.
+      </footer>
+    </main>
+
+    <div id="toast" hidden></div>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

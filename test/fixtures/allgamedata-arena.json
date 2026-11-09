@@ -1,0 +1,136 @@
+{
+  "activePlayer": {
+    "currentGold": 3400,
+    "level": 13,
+    "riotId": "Toi#EUW",
+    "riotIdGameName": "Toi",
+    "riotIdTagLine": "EUW",
+    "summonerName": "Toi#EUW"
+  },
+  "allPlayers": [
+    {
+      "championName": "Ahri",
+      "rawChampionName": "game_character_displayname_Ahri",
+      "isBot": false,
+      "isDead": false,
+      "level": 13,
+      "position": "",
+      "team": "ORDER",
+      "riotId": "Toi#EUW",
+      "riotIdGameName": "Toi",
+      "riotIdTagLine": "EUW",
+      "summonerName": "Toi#EUW",
+      "scores": {
+        "kills": 6,
+        "deaths": 3,
+        "assists": 9,
+        "creepScore": 40,
+        "wardScore": 0
+      },
+      "items": [
+        {
+          "itemID": 226655,
+          "slot": 0,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "championName": "Lulu",
+      "rawChampionName": "game_character_displayname_Lulu",
+      "isBot": false,
+      "isDead": false,
+      "level": 12,
+      "position": "",
+      "team": "ORDER",
+      "riotId": "LuluP#EUW",
+      "riotIdGameName": "LuluP",
+      "riotIdTagLine": "EUW",
+      "summonerName": "LuluP#EUW",
+      "scores": {
+        "kills": 1,
+        "deaths": 4,
+        "assists": 14,
+        "creepScore": 40,
+        "wardScore": 0
+      },
+      "items": [
+        {
+          "itemID": 3020,
+          "slot": 0,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "championName": "Ornn",
+      "rawChampionName": "game_character_displayname_Ornn",
+      "isBot": false,
+      "isDead": false,
+      "level": 13,
+      "position": "",
+      "team": "ORDER",
+      "riotId": "OrnnP#EUW",
+      "riotIdGameName": "OrnnP",
+      "riotIdTagLine": "EUW",
+      "summonerName": "OrnnP#EUW",
+      "scores": {
+        "kills": 2,
+        "deaths": 5,
+        "assists": 10,
+        "creepScore": 40,
+        "wardScore": 0
+      },
+      "items": [
+        {
+          "itemID": 3047,
+          "slot": 0,
+          "count": 1
+        }
+      ]
+    },
+    {
+      "championName": "Kai'Sa",
+      "rawChampionName": "game_character_displayname_Kaisa",
+      "isBot": false,
+      "isDead": false,
+      "level": 13,
+      "position": "",
+      "team": "ORDER",
+      "riotId": "KaisaP#EUW",
+      "riotIdGameName": "KaisaP",
+      "riotIdTagLine": "EUW",
+      "summonerName": "KaisaP#EUW",
+      "scores": {
+        "kills": 7,
+        "deaths": 4,
+        "assists": 6,
+        "creepScore": 40,
+        "wardScore": 0
+      },
+      "items": [
+        {
+          "itemID": 6672,
+          "slot": 0,
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "events": {
+    "Events": [
+      {
+        "EventID": 0,
+        "EventName": "GameStart",
+        "EventTime": 0.03
+      }
+    ]
+  },
+  "gameData": {
+    "gameMode": "CHERRY",
+    "gameTime": 640,
+    "mapName": "Map30",
+    "mapNumber": 30,
+    "mapTerrain": "Default"
+  }
+}
