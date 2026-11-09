@@ -173,7 +173,7 @@ test('ARAM en sélection : runes et sorts ARAM (Marque)', () => {
   assert.equal(vm.header.opponent, null);
   assert.equal(vm.page.keystone.name, 'Arcane Comet');
   assert.deepEqual(vm.spells.list.map((x) => x.name), ['Flash', 'Mark']);
-  assert.deepEqual(vm.start.map((x) => x.name).sort(), ['Amplifying Tome', 'Boots', 'Health Potion']);
+  assert.deepEqual(vm.start.map((x) => x.name).sort(), ['Amplifying Tome', 'Health Potion']);
   assert.ok(vm.hint, 'import des runes possible');
 });
 
@@ -293,4 +293,25 @@ test('Langue : choix de la langue Data Dragon et fragments traduits', () => {
   assert.equal(en.shardName(5008), 'Adaptive Force');
   const fr = new DDragon().ingest({ ...raw, language: 'fr_FR' });
   assert.equal(fr.shardName(5008), 'Force adaptative');
+});
+
+test('ARAM et ARAM Mayhem : jamais de bottes, 6 objets dans le build complet', () => {
+  for (const gameMode of ['ARAM', 'KIWI']) {
+    const g = JSON.parse(JSON.stringify(require('../demo/allgamedata-aram.json')));
+    g.gameData.gameMode = gameMode;
+    for (const p of g.allPlayers) if (p.items) p.items = p.items.filter((x) => x.itemID !== 3020);
+    const store = new Store(null);
+    store.add([...aramAhriRecords(), ...roleRecords()]);
+    const rec = new Recommender({ store, dd });
+    const vm = computeIngame({ dd, store, rec, game: normalizeLive(g, dd), hasKey: true });
+    const isBoots = (id) => id === 1001 || (dd.item(id) || {}).isBoots;
+    assert.equal(vm.boots, null, `${gameMode} : pas de bottes conseillées`);
+    assert.ok(!vm.options.some((o) => isBoots(o.id)));
+    assert.equal(vm.full.length, 6, `${gameMode} : 6 objets`);
+    assert.ok(!vm.full.some((it) => isBoots(it.id)), 'aucune botte dans le build complet');
+    assert.equal(new Set(vm.full.map((it) => it.id)).size, 6);
+    const cs = rec.champSelect({ champKey: 103, role: '', family: gameMode === 'ARAM' ? 'aram' : 'mayhem' });
+    assert.equal(cs.boots, null);
+    assert.ok(cs.starts.length && cs.starts.every((s) => !s.ids.some(isBoots)), 'départs sans bottes');
+  }
 });

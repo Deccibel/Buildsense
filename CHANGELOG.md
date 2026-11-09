@@ -9,6 +9,7 @@ Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est 
 - Joueurs suivis : ajoute un joueur par son Riot ID (ex. Hide on bush#KR1) pour voir et copier ses builds.
 - Nouvel onglet Meta : top 5 des champions par poste, par % de pick ou % de victoire, de Platine et moins jusqu'à GM et plus.
 - Raccourcis modifiables (onglet Overlay), quelle que soit la disposition du clavier.
+- ARAM et ARAM Mayhem : plus aucune botte conseillée, le build complet compte 6 objets.
 
 ## 1.5.0
 

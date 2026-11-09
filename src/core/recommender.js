@@ -6,6 +6,13 @@ const { FAMILIES } = require('./modes');
 
 const mapOfRecord = (r) => (FAMILIES[r.q || 'sr'] || FAMILIES.sr).map;
 
+// ARAM et ARAM Mayhem : jamais de bottes conseillées, 6 objets à la place
+const NO_BOOTS = new Set(['aram', 'mayhem']);
+const isBootsItem = (dd, id) => {
+  const it = dd.item(id);
+  return !!it && (it.isBoots || id === 1001);
+};
+
 const MIN_ROLE = 15; // parties minimum à un poste pour n'utiliser que celles-là
 const ROLE_BOOST = 4; // poids des parties jouées au poste demandé quand on mélange les postes
 
@@ -373,8 +380,9 @@ class Recommender {
       opts.sort((a, b) => b.score - a.score);
       let pick = opts[0];
       if (!pick) {
-        // peu de données : les objets les plus construits sur ce champion
-        const id = [...prof.itemFreq.entries()].sort((a, b) => b[1] - a[1]).map(([i]) => i).find(free);
+        // peu de données : les objets les plus construits sur ce champion,
+        // sinon un objet du mode qui va avec son style (mêmes statistiques que ses objets habituels)
+        const id = [...prof.itemFreq.entries()].sort((a, b) => b[1] - a[1]).map(([i]) => i).find(free) || this.fillerItem(prof, chosen, free, map);
         if (!id) break;
         pick = { id, reasons: [], situational: false };
       }
@@ -385,12 +393,37 @@ class Recommender {
     return out;
   }
 
+  /** Objet légendaire du mode le plus proche du style du champion (statistiques de ses objets habituels). */
+  fillerItem(prof, chosen, free, map) {
+    const dd = this.dd;
+    const weight = new Map();
+    const base = [...prof.itemFreq.keys(), ...chosen];
+    for (const id of base) {
+      const it = dd.item(id);
+      if (!it) continue;
+      for (const t of it.tags || []) weight.set(t, (weight.get(t) || 0) + 1);
+    }
+    if (!weight.size) return null;
+    let best = null;
+    let bestScore = 0;
+    for (const it of dd.legendaryItems(map || prof.map)) {
+      if (!free(it.id)) continue;
+      const score = (it.tags || []).reduce((sum, t) => sum + (weight.get(t) || 0), 0) / Math.sqrt((it.tags || []).length || 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = it.id;
+      }
+    }
+    return best;
+  }
+
   nextItems({ champKey, role, family = 'sr', map = null, myItems = [], enemyKeys = [], oppKey = 0, needs = { boosts: [], bootBoosts: [] }, gold = 0, preset = null }) {
     const dd = this.dd;
     const prof = this.profile(champKey, role, family);
     const itemMap = map || prof.map;
     // objets absents de la carte jouée (si Data Dragon connaît cette carte) : jamais proposés
-    const available = (id) => !dd.hasMap(itemMap) || dd.onMap(id, itemMap);
+    const noBoots = NO_BOOTS.has(family);
+    const available = (id) => (!dd.hasMap(itemMap) || dd.onMap(id, itemMap)) && !(noBoots && isBootsItem(dd, id));
     const owned = new Set(myItems.map(Number));
     const ownedLeg = [...owned].filter((id) => dd.isLegendary(id, itemMap) || dd.isLegendary(id, prof.map));
     const ownedGroups = new Set(ownedLeg.map((id) => dd.item(id).group).filter(Boolean));
@@ -455,7 +488,7 @@ class Recommender {
       const it = dd.item(id);
       return it && it.isBoots;
     });
-    const boots = ownsBoots ? null : this.bootsChoice(prof, liveFeat, oppKey, needs.bootBoosts || [], dd.hasMap(itemMap) ? itemMap : prof.map);
+    const boots = ownsBoots || noBoots ? null : this.bootsChoice(prof, liveFeat, oppKey, needs.bootBoosts || [], dd.hasMap(itemMap) ? itemMap : prof.map);
     const plan = options[0] ? planPurchase(dd, options[0].id, myItems, gold) : null;
     const core = this.coreBuild(prof, liveFeat, oppKey, preset);
     if (core) core.ids = core.ids.filter(available);
@@ -464,7 +497,7 @@ class Recommender {
       return it && it.isBoots;
     });
     const full = prof.n
-      ? this.completeBuild({ prof, ownedLeg, available, liveFeat, oppKey, boosts: needs.boosts || [], preset, map: dd.hasMap(itemMap) ? itemMap : prof.map })
+      ? this.completeBuild({ prof, ownedLeg, available, liveFeat, oppKey, boosts: needs.boosts || [], preset, map: dd.hasMap(itemMap) ? itemMap : prof.map, slots: noBoots ? 6 : 5 })
       : [];
 
     return {
@@ -475,7 +508,7 @@ class Recommender {
       boots,
       plan,
       core: core && core.ids.length ? core : null,
-      full: full.length ? { items: full, boots: ownedBoots ? { id: ownedBoots, owned: true } : boots ? { id: boots.id, owned: false } : null } : null,
+      full: full.length ? { items: full, boots: noBoots ? null : ownedBoots ? { id: ownedBoots, owned: true } : boots ? { id: boots.id, owned: false } : null } : null,
       skills: this.skillOrder(prof),
       n: prof.n,
       nAll: prof.nAll,
@@ -543,6 +576,25 @@ class Recommender {
     return { role: prof.role, mainRole: prof.mainRole, n: prof.n, variants: out };
   }
 
+  /** Départs sans bottes (ARAM) : les bottes sont retirées et les départs identiques regroupés. */
+  startsWithoutBoots(starts, total) {
+    const merged = new Map();
+    for (const [key, v] of starts) {
+      const ids = key.split(',').map(Number).filter((id) => !isBootsItem(this.dd, id));
+      if (!ids.length) continue;
+      const k = ids.join(',');
+      const m = merged.get(k) || { w: 0, win: 0, n: 0 };
+      m.w += v.w;
+      m.win += v.win;
+      m.n += v.n;
+      merged.set(k, m);
+    }
+    return [...merged.entries()]
+      .map(([key, v]) => ({ key, ids: key.split(',').map(Number), share: v.w / (total || 1), wr: smoothWr(v), n: v.n }))
+      .sort((a, b) => b.share - a.share)
+      .slice(0, 3);
+  }
+
   /** Recommandations pour la sélection des champions (runes, sorts, départ, ordre des compétences). */
   champSelect({ champKey, role, family = 'sr', oppKey = 0, enemyKeys = [], preset = null }) {
     const prof = this.profile(champKey, role, family);
@@ -605,10 +657,10 @@ class Recommender {
       pages: top(pages, 2).map((p) => ({ ...p, ru: p.key.split(',').map(Number) })),
       keystones: top(keystones, 3).map((k) => ({ ...k, id: Number(k.key) })),
       spells: top(spells, 2, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
-      starts: top(starts, 3, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
+      starts: NO_BOOTS.has(family) ? this.startsWithoutBoots(starts, kitTotal) : top(starts, 3, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
       skills: this.skillOrder(prof),
       core: this.coreBuild(prof, liveFeat, oppKey, preset),
-      boots: this.bootsChoice(prof, liveFeat, oppKey, []),
+      boots: NO_BOOTS.has(family) ? null : this.bootsChoice(prof, liveFeat, oppKey, []),
     };
   }
 }
