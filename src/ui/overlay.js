@@ -386,6 +386,7 @@ function showToast({ text, level }) {
 function applySettings(s) {
   document.documentElement.style.setProperty('--opacity', String(s.opacity ?? 0.95));
   document.body.classList.toggle('compact', !!s.compact);
+  document.documentElement.dataset.accent = s.accent || 'cyan';
   document.body.classList.toggle('move', !!s.moveMode);
   const banner = $('#move-banner');
   banner.hidden = !s.moveMode;

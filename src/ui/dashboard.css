@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #0a0d14;
   --side: #0d121b;
   --surface: #121925;
@@ -8,14 +9,165 @@
   --text: #e8edf3;
   --muted: #8a97a8;
   --dim: #5d697a;
+  --fg-rgb: 255, 255, 255;
+  --knob: #ffffff;
   --accent: #2ee6c5;
-  --accent-2: #1fbfa3;
-  --accent-soft: rgba(46, 230, 197, 0.12);
+  --accent-rgb: 46, 230, 197;
+  --accent-2: color-mix(in srgb, var(--accent) 82%, #000);
+  --accent-hi: color-mix(in srgb, var(--accent) 70%, #fff);
+  --accent-soft: rgba(var(--accent-rgb), 0.12);
+  --on-accent: #071311;
   --gold: #f5c451;
   --danger: #ff5d6c;
   --warn: #ffb547;
   --ok: #3ddc84;
 }
+
+/* thème clair (choisi, ou automatique quand Windows est en clair) */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f3f5f9;
+    --side: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #eef1f6;
+    --line: #e1e6ee;
+    --line-2: #cdd5e0;
+    --text: #131a26;
+    --muted: #586374;
+    --dim: #6f7a8b;
+    --fg-rgb: 15, 23, 42;
+    --knob: #ffffff;
+    --accent: #0e9a86;
+    --accent-rgb: 14, 154, 134;
+    --on-accent: #ffffff;
+    --gold: #a86f10;
+    --danger: #d43347;
+    --warn: #b86e00;
+    --ok: #17914f;
+  }
+}
+
+:root[data-accent='cyan'] {
+  --accent: #2ee6c5;
+  --accent-rgb: 46, 230, 197;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='cyan'] {
+    --accent: #0e9a86;
+    --accent-rgb: 14, 154, 134;
+  }
+}
+
+:root[data-accent='red'] {
+  --accent: #ff4d5e;
+  --accent-rgb: 255, 77, 94;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='red'] {
+    --accent: #d42a3c;
+    --accent-rgb: 212, 42, 60;
+  }
+}
+
+:root[data-accent='green'] {
+  --accent: #3ddc84;
+  --accent-rgb: 61, 220, 132;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='green'] {
+    --accent: #18924d;
+    --accent-rgb: 24, 146, 77;
+  }
+}
+
+:root[data-accent='yellow'] {
+  --accent: #f5d142;
+  --accent-rgb: 245, 209, 66;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='yellow'] {
+    --accent: #9c7f00;
+    --accent-rgb: 156, 127, 0;
+  }
+}
+
+:root[data-accent='orange'] {
+  --accent: #ff9a3c;
+  --accent-rgb: 255, 154, 60;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='orange'] {
+    --accent: #cc6a0c;
+    --accent-rgb: 204, 106, 12;
+  }
+}
+
+:root[data-accent='purple'] {
+  --accent: #b48cff;
+  --accent-rgb: 180, 140, 255;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='purple'] {
+    --accent: #7647d8;
+    --accent-rgb: 118, 71, 216;
+  }
+}
+
+:root[data-accent='blue'] {
+  --accent: #4d9fff;
+  --accent-rgb: 77, 159, 255;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='blue'] {
+    --accent: #1f6bd1;
+    --accent-rgb: 31, 107, 209;
+  }
+}
+
+/* Classique (DA de League of Legends) : or hextech sur bleu nuit */
+:root[data-accent='classic'] {
+  --bg: #010a13;
+  --side: #061220;
+  --surface: #0a1628;
+  --surface-2: #0f1f33;
+  --line: #1e2a36;
+  --line-2: #463714;
+  --text: #f0e6d2;
+  --muted: #a09b8c;
+  --dim: #6b6a63;
+  --accent: #c8aa6e;
+  --accent-rgb: 200, 170, 110;
+  --on-accent: #010a13;
+  --gold: #f0e6d2;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='classic'] {
+    --bg: #efe6d3;
+    --side: #f7f0e1;
+    --surface: #fbf7ee;
+    --surface-2: #efe5d0;
+    --line: #ddcfb1;
+    --line-2: #c8aa6e;
+    --text: #1e2328;
+    --muted: #5f5a4f;
+    --dim: #8f8877;
+    --fg-rgb: 30, 35, 40;
+    --accent: #8f6a1f;
+    --accent-rgb: 143, 106, 31;
+    --on-accent: #fbf7ee;
+    --gold: #8f6a1f;
+  }
+}
+
 
 * {
   box-sizing: border-box;
@@ -245,12 +397,12 @@ main {
   border-radius: 9px;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   cursor: pointer;
 }
 
 .btn:hover {
-  background: #5ff0d6;
+  background: var(--accent-hi);
 }
 
 .btn:disabled {
@@ -299,8 +451,8 @@ main {
 
 /* ---------------- configuration initiale ---------------- */
 .setup {
-  border-color: rgba(46, 230, 197, 0.35);
-  background: linear-gradient(135deg, rgba(46, 230, 197, 0.09), var(--surface) 60%);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.09), var(--surface) 60%);
 }
 
 .setup h3 {
@@ -335,7 +487,7 @@ main {
 .step.done .n {
   background: var(--accent);
   border-color: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
 }
 
 .step .txt {
@@ -620,7 +772,7 @@ main {
 .champ.on img,
 .champ.on .ph {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(46, 230, 197, 0.18);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
 }
 
 .champ .cn {
@@ -645,7 +797,7 @@ main {
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   display: none;
   align-items: center;
   justify-content: center;
@@ -701,7 +853,7 @@ select {
 
 input:focus,
 select:focus {
-  outline: 2px solid rgba(46, 230, 197, 0.45);
+  outline: 2px solid rgba(var(--accent-rgb), 0.45);
   outline-offset: 0;
 }
 
@@ -781,7 +933,7 @@ input[type='range'] {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--knob);
   transition: transform 0.15s;
 }
 
@@ -943,8 +1095,8 @@ kbd,
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  border-color: rgba(46, 230, 197, 0.45);
-  background: linear-gradient(135deg, rgba(46, 230, 197, 0.12), var(--surface));
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.12), var(--surface));
 }
 
 .livebanner[hidden] {
@@ -1188,7 +1340,7 @@ kbd,
   padding: 2px 9px;
   border-radius: 6px;
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -1343,8 +1495,8 @@ kbd,
 }
 
 .lv-opt.best {
-  background: linear-gradient(135deg, rgba(46, 230, 197, 0.11), rgba(255, 255, 255, 0.02));
-  border-color: rgba(46, 230, 197, 0.3);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.11), rgba(var(--fg-rgb), 0.02));
+  border-color: rgba(var(--accent-rgb), 0.3);
 }
 
 .lv-opt .ic {
@@ -1806,7 +1958,7 @@ kbd,
 
 .lv-item.opp .ic {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(46, 230, 197, 0.25);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.25);
 }
 
 .lv-sample {
@@ -1858,8 +2010,8 @@ kbd,
 /* ---------------- mises à jour ---------------- */
 .card.update,
 .card.whatsnew {
-  border-color: rgba(46, 230, 197, 0.45);
-  background: linear-gradient(135deg, rgba(46, 230, 197, 0.1), var(--surface));
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1), var(--surface));
 }
 
 .card.update[hidden],
@@ -1894,7 +2046,7 @@ kbd,
   flex: none;
   border-radius: 10px;
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   font-size: 18px;
   font-weight: 900;
 }
@@ -1931,4 +2083,55 @@ kbd,
 
 .upd-notes li {
   margin: 3px 0;
+}
+
+/* Classique : ambiance League of Legends (titres à empattements, or et bleu nuit) */
+:root[data-accent='classic'] h1,
+:root[data-accent='classic'] h2,
+:root[data-accent='classic'] h3 {
+  font-family: 'Beaufort for LOL', 'Beaufort', Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.02em;
+}
+
+/* ---------------- apparence ---------------- */
+.appearance .field + .field {
+  margin-top: 14px;
+}
+
+#themeSeg button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px 7px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.swatch .dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }

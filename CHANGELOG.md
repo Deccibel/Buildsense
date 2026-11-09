@@ -2,6 +2,12 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 1.4.0
+
+- Apparence : thème clair, sombre ou automatique (comme Windows), dans Réglages › Apparence.
+- 7 couleurs d'accent (cyan, rouge, vert, jaune, orange, mauve, bleu) et un style Classique aux couleurs de League of Legends.
+- L'overlay suit le thème et la couleur choisis.
+
 ## 1.3.0
 
 - Mises à jour automatiques : BuildSense détecte les nouvelles versions, les télécharge en fond (jamais pendant une partie) et s'installe en un clic.

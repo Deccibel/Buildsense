@@ -1,13 +1,20 @@
 :root {
+  color-scheme: dark;
   --bg: rgba(9, 12, 19, 0.94);
-  --surface: rgba(255, 255, 255, 0.035);
-  --surface-2: rgba(255, 255, 255, 0.07);
-  --line: rgba(255, 255, 255, 0.07);
+  --side: #0d121b;
+  --chip-bg: #0a0d14;
+  --fg-rgb: 255, 255, 255;
+  --surface: rgba(var(--fg-rgb), 0.035);
+  --surface-2: rgba(var(--fg-rgb), 0.07);
+  --line: rgba(var(--fg-rgb), 0.07);
   --text: #e8edf3;
   --muted: #8a97a8;
   --dim: #5d697a;
   --accent: #2ee6c5;
-  --accent-soft: rgba(46, 230, 197, 0.13);
+  --accent-rgb: 46, 230, 197;
+  --accent-hi: color-mix(in srgb, var(--accent) 45%, #fff);
+  --accent-soft: rgba(var(--accent-rgb), 0.13);
+  --on-accent: #071311;
   --gold: #f5c451;
   --ad: #ff9f43;
   --ap: #5aa9ff;
@@ -16,6 +23,143 @@
   --ok: #3ddc84;
   --opacity: 0.95;
 }
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: rgba(248, 250, 252, 0.95);
+    --side: #ffffff;
+    --chip-bg: #ffffff;
+    --fg-rgb: 15, 23, 42;
+    --text: #131a26;
+    --muted: #586374;
+    --dim: #6f7a8b;
+    --accent: #0e9a86;
+    --accent-rgb: 14, 154, 134;
+    --accent-hi: color-mix(in srgb, var(--accent) 70%, #000);
+    --on-accent: #ffffff;
+    --gold: #a86f10;
+    --ad: #c4610a;
+    --ap: #1f6bd1;
+    --danger: #d43347;
+    --warn: #b86e00;
+    --ok: #17914f;
+  }
+}
+
+:root[data-accent='cyan'] {
+  --accent: #2ee6c5;
+  --accent-rgb: 46, 230, 197;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='cyan'] {
+    --accent: #0e9a86;
+    --accent-rgb: 14, 154, 134;
+  }
+}
+
+:root[data-accent='red'] {
+  --accent: #ff4d5e;
+  --accent-rgb: 255, 77, 94;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='red'] {
+    --accent: #d42a3c;
+    --accent-rgb: 212, 42, 60;
+  }
+}
+
+:root[data-accent='green'] {
+  --accent: #3ddc84;
+  --accent-rgb: 61, 220, 132;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='green'] {
+    --accent: #18924d;
+    --accent-rgb: 24, 146, 77;
+  }
+}
+
+:root[data-accent='yellow'] {
+  --accent: #f5d142;
+  --accent-rgb: 245, 209, 66;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='yellow'] {
+    --accent: #9c7f00;
+    --accent-rgb: 156, 127, 0;
+  }
+}
+
+:root[data-accent='orange'] {
+  --accent: #ff9a3c;
+  --accent-rgb: 255, 154, 60;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='orange'] {
+    --accent: #cc6a0c;
+    --accent-rgb: 204, 106, 12;
+  }
+}
+
+:root[data-accent='purple'] {
+  --accent: #b48cff;
+  --accent-rgb: 180, 140, 255;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='purple'] {
+    --accent: #7647d8;
+    --accent-rgb: 118, 71, 216;
+  }
+}
+
+:root[data-accent='blue'] {
+  --accent: #4d9fff;
+  --accent-rgb: 77, 159, 255;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='blue'] {
+    --accent: #1f6bd1;
+    --accent-rgb: 31, 107, 209;
+  }
+}
+
+:root[data-accent='classic'] {
+  --bg: rgba(1, 10, 19, 0.95);
+  --side: #061220;
+  --chip-bg: #010a13;
+  --text: #f0e6d2;
+  --muted: #a09b8c;
+  --dim: #6b6a63;
+  --accent: #c8aa6e;
+  --accent-rgb: 200, 170, 110;
+  --on-accent: #010a13;
+  --gold: #f0e6d2;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='classic'] {
+    --bg: rgba(244, 237, 222, 0.96);
+    --side: #f7f0e1;
+    --chip-bg: #fbf7ee;
+    --fg-rgb: 30, 35, 40;
+    --text: #1e2328;
+    --muted: #5f5a4f;
+    --dim: #8f8877;
+    --accent: #8f6a1f;
+    --accent-rgb: 143, 106, 31;
+    --on-accent: #fbf7ee;
+    --gold: #8f6a1f;
+  }
+}
+
 
 * {
   box-sizing: border-box;
@@ -47,7 +191,7 @@ body.preview {
   position: relative;
   width: 340px;
   background: var(--bg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--fg-rgb), 0.08);
   border-radius: 14px;
   overflow: hidden;
   opacity: var(--opacity);
@@ -58,7 +202,7 @@ body.preview {
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent), rgba(46, 230, 197, 0) 75%);
+  background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0) 75%);
 }
 
 body.move .panel {
@@ -70,7 +214,7 @@ body.move .panel {
 
 #move-banner {
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   font-weight: 700;
   padding: 6px 12px;
   font-size: 11.5px;
@@ -82,7 +226,7 @@ body.move .panel {
   flex: none;
   object-fit: cover;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(var(--fg-rgb), 0.16);
   background: #161d2a;
 }
 
@@ -105,7 +249,7 @@ body.move .panel {
   align-items: center;
   gap: 11px;
   padding: 13px 12px 11px;
-  background: linear-gradient(180deg, var(--accent-soft), rgba(46, 230, 197, 0));
+  background: linear-gradient(180deg, var(--accent-soft), rgba(var(--accent-rgb), 0));
 }
 
 .portrait {
@@ -128,7 +272,7 @@ body.move .panel {
   height: 18px;
   padding: 0 4px;
   border-radius: 9px;
-  background: #0a0d14;
+  background: var(--chip-bg);
   border: 1px solid var(--accent);
   color: var(--text);
   font-size: 10px;
@@ -164,7 +308,7 @@ body.move .panel {
   padding: 1px 6px;
   border-radius: 5px;
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   font-size: 9.5px;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -315,7 +459,7 @@ body.move .panel {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(var(--fg-rgb), 0.14);
 }
 
 .enemy.opp .pic .ic {
@@ -333,7 +477,7 @@ body.move .panel {
   min-width: 16px;
   height: 16px;
   font-size: 9px;
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(var(--fg-rgb), 0.25);
 }
 
 .fedtag {
@@ -420,8 +564,8 @@ body.move .panel {
   gap: 11px;
   padding: 10px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(46, 230, 197, 0.11), rgba(255, 255, 255, 0.025));
-  border: 1px solid rgba(46, 230, 197, 0.3);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.11), rgba(var(--fg-rgb), 0.025));
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 
 .pick .ic {
@@ -497,12 +641,12 @@ body.move .panel {
 }
 
 .why li.boost {
-  color: #bff7ec;
+  color: var(--accent-hi);
 }
 
 .why li.boost::before {
   background: var(--accent);
-  box-shadow: 0 0 6px rgba(46, 230, 197, 0.7);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.7);
 }
 
 .alts {
@@ -536,7 +680,7 @@ body.move .panel {
 }
 
 .alt .why1.boost {
-  color: #bff7ec;
+  color: var(--accent-hi);
 }
 
 .situ {
@@ -709,7 +853,7 @@ body.move .panel {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid #0d121b;
+  border: 2px solid var(--side);
 }
 
 .champs .ic + .ic {
@@ -752,7 +896,7 @@ body.move .panel {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #0d121b;
+  border: 2px solid var(--side);
 }
 
 .chev {
@@ -768,7 +912,7 @@ body.move .panel {
   gap: 7px;
   padding: 9px 12px 10px;
   border-top: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(var(--fg-rgb), 0.05);
 }
 
 .skills {
@@ -858,7 +1002,7 @@ body.move .panel {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(var(--fg-rgb), 0.14);
 }
 
 .picks .opp .ic {
@@ -876,7 +1020,7 @@ body.move .panel {
   height: 48px;
   border-radius: 50%;
   border: 2px solid var(--accent);
-  background: #0d121b;
+  background: var(--side);
 }
 
 .ks-name {
@@ -916,7 +1060,7 @@ body.move .panel {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #0d121b;
+  background: var(--side);
 }
 
 .runes .sep {
@@ -975,7 +1119,7 @@ body.move .panel {
   gap: 4px 8px;
   padding: 8px 12px;
   background: var(--accent);
-  color: #061512;
+  color: var(--on-accent);
   font-size: 11.5px;
   font-weight: 700;
 }
@@ -1090,8 +1234,8 @@ kbd,
 
 .hint.runes kbd {
   color: var(--accent);
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--fg-rgb), 0.04);
+  border-color: rgba(var(--fg-rgb), 0.14);
 }
 
 .hint.role-hint {
@@ -1105,8 +1249,8 @@ kbd,
 
 .hint.role-hint kbd {
   color: var(--accent);
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(var(--fg-rgb), 0.04);
+  border-color: rgba(var(--fg-rgb), 0.14);
 }
 
 /* initiales à la place d'une icône manquante : jamais coupées, réduites dans les petites icônes */
@@ -1126,4 +1270,11 @@ kbd,
 .shard .ph,
 .runes .shard .ph {
   font-size: 8px;
+}
+
+/* Classique : ambiance League of Legends (titres à empattements, or et bleu nuit) */
+:root[data-accent='classic'] .name .champ,
+:root[data-accent='classic'] .label {
+  font-family: 'Beaufort for LOL', 'Beaufort', Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.02em;
 }

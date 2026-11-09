@@ -769,6 +769,37 @@ async function installUpdate() {
   showToast({ text: r.message, level: r.ok ? 'ok' : 'warn' });
 }
 
+const ACCENT_LIST = [
+  ['cyan', 'Cyan', '#2ee6c5'],
+  ['red', 'Rouge', '#ff4d5e'],
+  ['green', 'Vert', '#3ddc84'],
+  ['yellow', 'Jaune', '#f5d142'],
+  ['orange', 'Orange', '#ff9a3c'],
+  ['purple', 'Mauve', '#b48cff'],
+  ['blue', 'Bleu', '#4d9fff'],
+  ['classic', 'Classique LoL', 'linear-gradient(135deg, #c8aa6e 0 50%, #0a1428 50% 100%)'],
+];
+
+function renderAppearance(s) {
+  const a = s.config.appearance || { theme: 'dark', accent: 'cyan' };
+  document.documentElement.dataset.accent = a.accent;
+  for (const b of $$('#themeSeg button')) b.classList.toggle('active', b.dataset.theme === a.theme);
+  const box = $('#accentPick');
+  if (!box.childElementCount) {
+    box.append(
+      ...ACCENT_LIST.map(([id, label, color]) =>
+        h(
+          'button',
+          { class: 'swatch', 'data-accent': id, title: label, onclick: () => saveConfig({ appearance: { accent: id } }) },
+          h('span', { class: 'dot', style: { background: color } }),
+          h('span', null, label),
+        ),
+      ),
+    );
+  }
+  for (const b of $$('#accentPick .swatch')) b.classList.toggle('active', b.dataset.accent === a.accent);
+}
+
 function renderUpdate(s) {
   const u = s.update;
   $('#version').textContent = `version ${s.version || ''}`.trim();
@@ -841,6 +872,7 @@ function render() {
   renderModeStats(s);
   renderSettingsExtras(s);
   renderUpdate(s);
+  renderAppearance(s);
   renderLive(s);
   if (!$('#page-champs').hidden) renderRolePrefs();
   $('#roleKey').textContent = s.hotkeys.role || '—';
@@ -1000,6 +1032,7 @@ function bind() {
     showToast({ text: 'Dossier enregistré.', level: 'ok' });
   });
   $('#language').addEventListener('change', (e) => saveConfig({ language: e.target.value }));
+  for (const b of $$('#themeSeg button')) b.addEventListener('click', () => saveConfig({ appearance: { theme: b.dataset.theme } }));
   $('#autoUpdate').addEventListener('change', (e) => saveConfig({ autoUpdate: e.target.checked }));
   $('#updCheck').addEventListener('click', async () => {
     $('#updStatus').textContent = 'Recherche d’une nouvelle version…';

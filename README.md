@@ -4,7 +4,7 @@ Overlay de builds pour League of Legends. BuildSense récupère les builds des m
 
 ## Installation (Windows)
 
-1. Lance **`BuildSense-Setup-1.3.0.exe`**. Si une version précédente est installée, elle est mise à jour et tes réglages sont conservés.
+1. Lance **`BuildSense-Setup-1.4.0.exe`**. Si une version précédente est installée, elle est mise à jour et tes réglages sont conservés.
 2. Windows affiche sûrement « Windows a protégé votre ordinateur ». C'est normal, l'exe n'est pas signé. Clique sur **Informations complémentaires**, puis **Exécuter quand même**.
 3. L'installation se fait dans ton dossier utilisateur, sans droits administrateur, avec un raccourci sur le bureau et dans le menu Démarrer. Coche **Lancer BuildSense** à la fin.
 
@@ -95,6 +95,10 @@ Au début de chaque partie, l'overlay réapparaît (même si tu l'avais masqué)
 La fenêtre principale a une page **En direct**. Elle affiche ta sélection et ta partie en grand : prochain objet et ses raisons, achat possible, équipe adverse, alertes, build type, runes, sorts, et le choix du poste. Mets-la sur ton second écran.
 
 Elle s'ouvre toute seule au début de chaque sélection, sans prendre le focus : ton jeu reste au premier plan. Tu peux désactiver ce comportement en bas de la page.
+
+## Apparence
+
+Réglages › Apparence : thème **Automatique** (suit Windows), **Clair** ou **Sombre**, et une couleur d'accent (cyan, rouge, vert, jaune, orange, mauve, bleu) ou **Classique LoL** (or et bleu nuit du jeu). L'overlay suit le même style.
 
 ## Langue
 

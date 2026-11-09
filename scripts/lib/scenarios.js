@@ -130,8 +130,9 @@ function updateState(status = 'up-to-date') {
   return { ...base, status, latest: status === 'up-to-date' ? '1.3.0' : base.latest, notes: status === 'up-to-date' ? [] : UPDATE_NOTES };
 }
 
-function dashboardState({ dd, store }, { live = null, rolePrefs = {}, phase = 'Lobby', update = 'up-to-date', whatsNew = false } = {}) {
+function dashboardState({ dd, store }, { live = null, rolePrefs = {}, phase = 'Lobby', update = 'up-to-date', whatsNew = false, appearance = null } = {}) {
   const config = deepMerge(DEFAULTS, {
+    ...(appearance ? { appearance } : {}),
     apiKey: 'RGAPI-00000000-0000-0000-0000-000000000000',
     favorites: [R.K.Ahri, R.K.Zed, R.K.Syndra, R.K.Thresh],
     rolePrefs,

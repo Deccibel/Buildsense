@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, nativeTheme } = require('electron');
 const { messageVM } = require('../src/core/viewModels');
 const S = require('./lib/scenarios');
 
@@ -288,6 +288,22 @@ async function selfTest() {
   console.log(`Auto-test du détecteur : OK (${issues.length} problème(s) volontaires repérés)\n`);
 }
 
+const APPEARANCES = [
+  ['light', 'cyan'],
+  ['dark', 'classic'],
+  ['light', 'classic'],
+  ['dark', 'purple'],
+];
+
+function themedScenarios(data, appearance) {
+  const vms = S.overlayVms(data);
+  return {
+    accueil: { page: 'home', state: S.dashboardState(data, { appearance, update: 'ready' }) },
+    direct: { page: 'live', state: S.dashboardState(data, { appearance, live: { source: 'game', vm: vms['partie-faille'] }, phase: 'InProgress' }) },
+    reglages: { page: 'settings', state: S.dashboardState(data, { appearance }) },
+  };
+}
+
 async function runCheck() {
   await selfTest();
   for (const L of S.LANGS) {
@@ -314,6 +330,22 @@ async function runCheck() {
       }
     }
   }
+  // thèmes : clair, classique sombre et clair (mise en page identique attendue)
+  const data = S.makeData({ lang: 'fr' });
+  const vms = S.overlayVms(data);
+  const champs = S.championsList(data);
+  for (const [theme, accent] of APPEARANCES) {
+    nativeTheme.themeSource = theme;
+    for (const name of ['partie-faille', 'selection-appliquee']) {
+      const win = await renderOverlay(vms[name], S.overlaySettings({ accent }));
+      record(`overlay ${theme}/${accent} ${name}`, await runCheckFn(win));
+    }
+    for (const [name, sc] of Object.entries(themedScenarios(data, { theme, accent }))) {
+      const w = await renderDashboard(sc.state, champs, sc.page, [1180, 860]);
+      await checkDashboardPage(w, `fenêtre ${theme}/${accent} ${name}`);
+    }
+  }
+  nativeTheme.themeSource = 'dark';
   const bad = report.filter((r) => r.issues.length);
   console.log(`\n${report.length} rendus vérifiés, ${bad.length} avec des problèmes.`);
   if (OUT) fs.writeFileSync(path.join(OUT, 'layout-report.json'), JSON.stringify(report, null, 2));
@@ -347,6 +379,16 @@ async function runShots() {
     const w = await renderDashboard(scen[name].state, champs, scen[name].page, [1180, 860]);
     fs.writeFileSync(path.join(OUT, `fenetre-${name}.png`), (await w.webContents.capturePage()).toPNG());
   }
+  for (const [theme, accent] of APPEARANCES) {
+    nativeTheme.themeSource = theme;
+    const t = themedScenarios(data, { theme, accent });
+    for (const name of ['direct', 'reglages']) {
+      const w = await renderDashboard(t[name].state, champs, t[name].page, [1180, 860]);
+      fs.writeFileSync(path.join(OUT, `theme-${theme}-${accent}-${name}.png`), (await w.webContents.capturePage()).toPNG());
+    }
+    await shootOverlay(`theme-${theme}-${accent}-overlay`, vms['partie-faille'], { ...base, accent });
+  }
+  nativeTheme.themeSource = 'dark';
   const w = await renderDashboard(scen['direct-partie'].state, champs, 'live', [760, 560]);
   fs.writeFileSync(path.join(OUT, 'fenetre-direct-petite.png'), (await w.webContents.capturePage()).toPNG());
   console.log(`Captures dans ${OUT}`);

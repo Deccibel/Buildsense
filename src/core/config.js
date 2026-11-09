@@ -24,6 +24,8 @@ const DEFAULTS = {
   autoRunes: true,
   // fenêtre principale : bascule sur la page "En direct" au début de chaque sélection/partie
   autoLivePage: true,
+  // apparence : thème 'auto' (comme Windows) | 'light' | 'dark', accent ou 'classic' (DA de LoL)
+  appearance: { theme: 'dark', accent: 'cyan' },
   // mises à jour : téléchargées en fond (jamais pendant une partie), installées sur ton clic
   autoUpdate: true,
   updateRepo: '', // dépôt GitHub des versions, "pseudo/nom" ('' = celui de package.json)

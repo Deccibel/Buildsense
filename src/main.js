@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, screen, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage, screen, shell, protocol, net, nativeTheme } = require('electron');
 
 const { Config } = require('./core/config');
 const { DDragon, DD_LANGUAGES, ddLanguage } = require('./core/ddragon');
@@ -120,6 +120,7 @@ async function init() {
   S.lcu = new LcuClient({ getLeaguePath: () => S.config.get('leaguePath') });
   setupIcons(userData);
   setupUpdater(userData);
+  nativeTheme.themeSource = THEMES[S.config.get('appearance').theme] || 'dark';
 
   createMainWindow();
   createOverlay();
@@ -363,7 +364,7 @@ function createMainWindow() {
     minHeight: 560,
     title: 'BuildSense',
     icon: path.join(ROOT, 'assets', 'icon.png'),
-    backgroundColor: '#0d1118',
+    backgroundColor: windowBackground(),
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
@@ -495,7 +496,26 @@ function pushOverlaySettings() {
     compact: !!o.compact,
     moveMode: S.moveMode,
     keys: { move: hotkeyLabel(hk.move), toggle: hotkeyLabel(hk.toggle), compact: hotkeyLabel(hk.compact) },
+    accent: S.config.get('appearance').accent,
   });
+}
+
+const THEMES = { auto: 'system', light: 'light', dark: 'dark' };
+const ACCENTS = ['cyan', 'red', 'green', 'yellow', 'orange', 'purple', 'blue', 'classic'];
+
+/** Thème : Electron applique clair/sombre à toutes les fenêtres (prefers-color-scheme). */
+function applyAppearance() {
+  const a = S.config.get('appearance');
+  nativeTheme.themeSource = THEMES[a.theme] || 'dark';
+  if (S.mainWin) S.mainWin.setBackgroundColor(windowBackground());
+  pushOverlaySettings();
+}
+
+function windowBackground() {
+  const a = S.config.get('appearance');
+  const light = nativeTheme.shouldUseDarkColors === false;
+  if (a.accent === 'classic') return light ? '#efe6d3' : '#010a13';
+  return light ? '#f3f5f9' : '#0a0d14';
 }
 
 function currentVm() {
@@ -1000,6 +1020,12 @@ function sanitizeConfig(patch) {
   }
   if (typeof patch.leaguePath === 'string' && patch.leaguePath.trim()) out.leaguePath = patch.leaguePath.trim();
   if (patch.language === 'auto' || DD_LANGUAGES.includes(patch.language)) out.language = patch.language;
+  if (patch.appearance && typeof patch.appearance === 'object') {
+    const a = {};
+    if (patch.appearance.theme in THEMES) a.theme = patch.appearance.theme;
+    if (ACCENTS.includes(patch.appearance.accent)) a.accent = patch.appearance.accent;
+    out.appearance = a;
+  }
   if (typeof patch.updateRepo === 'string') {
     const r = patch.updateRepo.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '');
     if (r === '' || REPO_RE.test(r)) out.updateRepo = r;
@@ -1041,6 +1067,7 @@ function registerIpc() {
       S.lastVmJson = '';
       refreshOverlay();
     }
+    if (p.appearance) applyAppearance();
     if ('updateRepo' in p && S.updater) {
       S.updater.setFeed(updateFeed());
       checkUpdates();
