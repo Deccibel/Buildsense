@@ -209,3 +209,49 @@ test('Nom de page : toujours dans la limite du client, poste conservé', () => {
   assert.ok(long.endsWith('… Support'), long);
   assert.ok(pageName('Ahri', '').length <= 25);
 });
+
+test('Début de partie : meilleur départ en tête, avec ses alternatives', () => {
+  const store = makeStore();
+  const rec = new Recommender({ store, dd });
+  const g = clone(demoGame);
+  g.gameData.gameTime = 15;
+  for (const p of g.allPlayers) p.items = [];
+  const vm = computeIngame({ dd, store, rec, game: normalizeLive(g, dd), hasKey: true });
+  assert.ok(vm.starters && vm.starters.length >= 2, 'plusieurs départs proposés');
+  assert.equal(vm.starters[0].best, true);
+  assert.ok(vm.starters.slice(1).every((s) => !s.best));
+  assert.ok(vm.starters[0].items.some((it) => it.id === 1056), "Anneau de Doran en meilleur départ d'Ahri mid");
+  assert.ok(vm.starters[0].items.some((it) => it.id === 2003 && it.count === 2), 'potions regroupées (×2)');
+
+  // une fois le départ acheté (ou plus tard dans la partie), le bloc disparaît
+  g.allPlayers.find((p) => p.summonerName === g.activePlayer.summonerName || p.riotId === g.activePlayer.riotId).items = [{ itemID: 1056 }];
+  assert.equal(computeIngame({ dd, store, rec, game: normalizeLive(g, dd), hasKey: true }).starters, undefined);
+  assert.equal(computeIngame({ dd, store, rec, game: normalizeLive(clone(demoGame), dd), hasKey: true }).starters, undefined);
+});
+
+test('Boutique : page d’objets BuildSense ajoutée sans toucher aux pages du joueur', async () => {
+  const lcu = new LcuClient({ getLeaguePath: () => '/nulle-part' });
+  const calls = [];
+  const mine = { uid: 'perso-1', title: 'Ma page', associatedChampions: [103], blocks: [] };
+  const old = { uid: 'buildsense-103', title: 'BuildSense · ancienne', blocks: [] };
+  lcu.request = async (method, url, body) => {
+    calls.push([method, url, body]);
+    if (url === '/lol-summoner/v1/current-summoner') return { ok: true, status: 200, data: { summonerId: 42, accountId: 7 } };
+    if (method === 'GET') return { ok: true, status: 200, data: { accountId: 7, itemSets: [mine, old], timestamp: 1 } };
+    return { ok: true, status: 201, data: body };
+  };
+  const r = await lcu.writeItemSet({
+    title: 'BuildSense · Ahri Mid',
+    champKey: 103,
+    map: 11,
+    blocks: [{ type: '★ Meilleur départ · 70 % des parties', items: [{ id: 1056, count: 1 }, { id: 2003, count: 2 }] }],
+  });
+  assert.equal(r.ok, true);
+  const put = calls.find((c) => c[0] === 'PUT');
+  assert.equal(put[1], '/lol-item-sets/v1/item-sets/42/sets');
+  const sets = put[2].itemSets;
+  assert.equal(sets.length, 2, 'ancienne page BuildSense remplacée, page du joueur gardée');
+  assert.equal(sets[0].uid, 'buildsense-103');
+  assert.deepEqual(sets[0].blocks[0].items, [{ id: '1056', count: 1 }, { id: '2003', count: 2 }]);
+  assert.ok(sets.some((s) => s.uid === 'perso-1'));
+});

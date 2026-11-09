@@ -79,6 +79,17 @@ function overlayVms({ dd, store, rec }) {
 
   const out = {
     'partie-faille': live('demo/allgamedata.json'),
+    'partie-debut': (() => {
+      const g = readJson('demo', 'allgamedata.json');
+      g.gameData.gameTime = 22;
+      g.activePlayer.currentGold = 500;
+      for (const p of g.allPlayers) {
+        p.items = [];
+        p.level = 1;
+        p.scores = { kills: 0, deaths: 0, assists: 0 };
+      }
+      return live(g);
+    })(),
     'partie-hors-poste': live('demo/allgamedata.json', {}, { roleChoice: offRole }),
     'partie-aram': live('demo/allgamedata-aram.json'),
     'partie-mayhem': live('demo/allgamedata-aram.json', { gameMode: 'KIWI' }),

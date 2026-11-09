@@ -247,12 +247,32 @@ function footer(vm, extraSkills) {
   );
 }
 
+/** Début de partie : les départs possibles, le meilleur encadré avec une bulle. */
+function startersSection(vm) {
+  if (!vm.starters || !vm.starters.length) return null;
+  return h(
+    'div',
+    { class: 'sec starters' },
+    label('Départ', 'ouvre la boutique'),
+    vm.starters.map((s) =>
+      h(
+        'div',
+        { class: `start ${s.best ? 'best' : ''}` },
+        s.best ? h('span', { class: 'bubble' }, '★ Meilleur choix') : null,
+        h('div', { class: 'items' }, s.items.map((it) => h('span', { class: 'it' }, icon(it.icon, it.name), it.count > 1 ? h('span', { class: 'count' }, `×${it.count}`) : null))),
+        h('div', { class: 'names' }, h('b', null, s.items.map((it) => it.name).join(' + ')), h('small', null, `${s.share} des parties${s.wr ? ` · ${s.wr} de victoires` : ''}`)),
+      ),
+    ),
+  );
+}
+
 function renderIngame(vm) {
   return [
     header(
       vm.header,
       h('div', { class: 'right' }, h('div', { class: 'goldpill' }, h('span', { class: 'coin' }), vm.header.gold), h('div', { class: 'clock' }, vm.header.clock)),
     ),
+    startersSection(vm),
     enemiesSection(vm),
     optionsSection(vm),
     buySection(vm),

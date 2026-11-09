@@ -465,7 +465,7 @@ class Recommender {
       pages: top(pages, 2).map((p) => ({ ...p, ru: p.key.split(',').map(Number) })),
       keystones: top(keystones, 3).map((k) => ({ ...k, id: Number(k.key) })),
       spells: top(spells, 2, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
-      starts: top(starts, 2, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
+      starts: top(starts, 3, kitTotal).map((s) => ({ ...s, ids: s.key.split(',').map(Number) })),
       skills: this.skillOrder(prof),
       core: this.coreBuild(prof, liveFeat, oppKey),
       boots: this.bootsChoice(prof, liveFeat, oppKey, []),

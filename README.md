@@ -4,7 +4,7 @@ Overlay de builds pour League of Legends. BuildSense récupère les builds des m
 
 ## Installation (Windows)
 
-1. Lance **`BuildSense-Setup-1.4.0.exe`**. Si une version précédente est installée, elle est mise à jour et tes réglages sont conservés.
+1. Lance **`BuildSense-Setup-1.5.0.exe`**. Si une version précédente est installée, elle est mise à jour et tes réglages sont conservés.
 2. Windows affiche sûrement « Windows a protégé votre ordinateur ». C'est normal, l'exe n'est pas signé. Clique sur **Informations complémentaires**, puis **Exécuter quand même**.
 3. L'installation se fait dans ton dossier utilisateur, sans droits administrateur, avec un raccourci sur le bureau et dans le menu Démarrer. Coche **Lancer BuildSense** à la fin.
 
@@ -81,6 +81,7 @@ Pendant la sélection, dès que tu **verrouilles** ton champion, BuildSense appl
 - L'état des runes automatiques.
 
 **En partie** (mis à jour chaque seconde)
+- **Le départ** (tant que rien n'est acheté) : les départs les plus joués, le meilleur encadré avec « ★ Meilleur choix ». Dans la boutique, la page d'objets « BuildSense » (onglet Recommandés) les reprend dans le même ordre.
 - **L'équipe adverse** : portrait, niveau, KDA, type de dégâts, ennemis *fed* signalés, et la répartition dégâts physiques / magiques.
 - **Le prochain objet** : 2 ou 3 options avec leur raison, qui peut venir de la partie (« Zed est fed », « anti-soins : Aatrox et Soraka ») ou des données (« 41 % des Chall/GM dans une partie similaire »).
 - **L'achat possible maintenant** : une barre de progression vers l'objet, et les composants à acheter avec ton or. Ceux que tu possèdes déjà sont déduits.

@@ -1278,3 +1278,86 @@ kbd,
   font-family: 'Beaufort for LOL', 'Beaufort', Georgia, 'Times New Roman', serif;
   letter-spacing: 0.02em;
 }
+
+/* ---------- départ (début de partie) ---------- */
+.starters .start {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.starters .start + .start {
+  margin-top: 5px;
+}
+
+.starters .start.best {
+  margin-top: 12px;
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+
+.starters .bubble {
+  position: absolute;
+  top: -10px;
+  left: 10px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.starters .items {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+
+.starters .it {
+  position: relative;
+}
+
+.starters .it .ic {
+  width: 28px;
+  height: 28px;
+}
+
+.starters .count {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  padding: 0 3px;
+  border-radius: 5px;
+  background: var(--chip-bg);
+  font-size: 9.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.starters .names {
+  flex: 1;
+  min-width: 0;
+}
+
+.starters .names b,
+.starters .names small {
+  display: block;
+}
+
+.starters .names b {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.starters .names small {
+  color: var(--muted);
+  font-size: 11px;
+}

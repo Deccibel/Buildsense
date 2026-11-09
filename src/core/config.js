@@ -22,6 +22,8 @@ const DEFAULTS = {
   rolePrefs: {},
   // en sélection : applique la page de runes recommandée (remplace la page active)
   autoRunes: true,
+  // en sélection : écrit une page d'objets BuildSense dans la boutique (meilleur départ en premier)
+  autoItemSet: true,
   // fenêtre principale : bascule sur la page "En direct" au début de chaque sélection/partie
   autoLivePage: true,
   // apparence : thème 'auto' (comme Windows) | 'light' | 'dark', accent ou 'classic' (DA de LoL)

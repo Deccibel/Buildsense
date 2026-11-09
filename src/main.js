@@ -750,6 +750,47 @@ async function autoApplyRunes(cs, vm) {
   }
 }
 
+/** Page d'objets de la boutique : meilleur départ en tête, puis les autres départs, le build et les bottes. */
+function itemSetOf(vm) {
+  const s = vm.itemSet;
+  if (!s || !s.starts.length) return null;
+  const group = (ids) => {
+    const m = new Map();
+    for (const id of ids) m.set(id, (m.get(id) || 0) + 1);
+    return [...m].map(([id, count]) => ({ id, count }));
+  };
+  const pct = (x) => `${Math.round(x * 100)} %`;
+  const blocks = s.starts.map((st, i) => ({
+    type: i === 0 ? `★ Meilleur départ · ${pct(st.share)} des parties` : `Autre départ · ${pct(st.share)}`,
+    items: group(st.ids),
+  }));
+  if (s.core.length) blocks.push({ type: 'Build conseillé', items: s.core.map((id) => ({ id, count: 1 })) });
+  if (s.boots) blocks.push({ type: 'Bottes', items: [{ id: s.boots, count: 1 }] });
+  return { title: `BuildSense · ${vm.header.champion}${vm.header.role ? ` ${vm.header.role}` : ''}`, champKey: s.champKey, map: s.map, blocks };
+}
+
+/** Une fois le champion verrouillé (stable 2 lectures), écrit la page d'objets dans le client. */
+async function autoApplyItemSet(cs, vm) {
+  const A = S.autoItems || (S.autoItems = { key: null, pending: null, busy: false });
+  if (!S.config.get('autoItemSet') || !cs || !cs.locked || !vm || A.busy) return;
+  const set = itemSetOf(vm);
+  if (!set) return;
+  const key = JSON.stringify([set.title, set.blocks]);
+  if (key === A.key) return;
+  if (A.pending !== key) {
+    A.pending = key;
+    return;
+  }
+  A.busy = true;
+  try {
+    const r = await S.lcu.writeItemSet(set);
+    A.key = key;
+    if (!r.ok) console.warn('[items]', r.message);
+  } finally {
+    A.busy = false;
+  }
+}
+
 async function liveTick() {
   let delay = 3000;
   try {
@@ -829,6 +870,7 @@ async function lcuTick() {
       }
       S.roleOverride = null;
       S.autoRunes = { key: null, pendingKey: null, applied: null, busy: false, status: null };
+      S.autoItems = { key: null, pending: null, busy: false };
     }
     S.prevPhase = phase;
     if (S.config.get('lcuEnabled') && S.dd.ready) {
@@ -839,6 +881,7 @@ async function lcuTick() {
         if (cs) {
           let vm = decorateChampSelect(computeCs(cs));
           await autoApplyRunes(cs, vm);
+          await autoApplyItemSet(cs, vm);
           vm = decorateChampSelect(vm); // état des runes à jour
           S.champSelect.vm = vm;
           S.champSelect.import = importOf(vm);
@@ -1012,7 +1055,7 @@ function sanitizeConfig(patch) {
   if (typeof patch.apiKey === 'string') out.apiKey = patch.apiKey.trim();
   if (PLATFORMS.includes(patch.platform)) out.platform = patch.platform;
   if (Array.isArray(patch.favorites)) out.favorites = [...new Set(patch.favorites.map(Number).filter((n) => n > 0))].slice(0, 20);
-  for (const k of ['crawlerEnabled', 'pauseCrawlerInGame', 'lcuEnabled', 'autoRunes', 'autoLivePage', 'autoUpdate']) if (typeof patch[k] === 'boolean') out[k] = patch[k];
+  for (const k of ['crawlerEnabled', 'pauseCrawlerInGame', 'lcuEnabled', 'autoRunes', 'autoItemSet', 'autoLivePage', 'autoUpdate']) if (typeof patch[k] === 'boolean') out[k] = patch[k];
   if (patch.rolePrefs && typeof patch.rolePrefs === 'object') {
     // '' = automatique (la fusion des réglages ne supprime pas les clés)
     out.rolePrefs = {};

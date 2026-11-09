@@ -2,6 +2,12 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 1.5.0
+
+- Début de partie : l'overlay montre les départs possibles, le meilleur encadré avec la bulle « ★ Meilleur choix ».
+- Boutique : une page d'objets « BuildSense » est ajoutée dans l'onglet Recommandés, avec le meilleur départ en premier, puis le build et les bottes.
+- Réglage pour désactiver la page d'objets (Réglages › Sélection des champions).
+
 ## 1.4.0
 
 - Apparence : thème clair, sombre ou automatique (comme Windows), dans Réglages › Apparence.

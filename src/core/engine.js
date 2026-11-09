@@ -1,7 +1,7 @@
 'use strict';
 
 const { analyzeEnemies, buildNeeds } = require('./analyzer');
-const { ingameVM, champSelectVM, messageVM } = require('./viewModels');
+const { ingameVM, champSelectVM, messageVM, startersVM } = require('./viewModels');
 const { detectMode } = require('./modes');
 
 const ROLE_IDS = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
@@ -56,6 +56,10 @@ function findOpponent(game, role, store) {
 /**
  * Vue "en partie". `mode` vient de detectMode() ; s'il manque, il est déduit de la partie.
  */
+// balises (achetées gratuitement) : ne comptent pas comme un départ
+const TRINKETS = new Set([3340, 3363, 3364, 3330]);
+const STARTER_WINDOW = 150; // secondes : on montre le départ tant que rien n'est acheté
+
 function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice = null }) {
   mode = mode || detectMode({ gameMode: game.gameMode, mapNumber: game.mapNumber, queueId: game.queueId });
   if (!mode.supported) return messageVM(mode.label || 'Mode non pris en charge', mode.message || 'Ce mode n’est pas pris en charge.');
@@ -81,6 +85,19 @@ function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice =
     gold: game.me.gold,
   });
   const vm = ingameVM({ dd, game, analysis, needs, rec: result, opponent, latestPatch: store.latestPatch(), hasKey, mode, roleSource: picked.source });
+  // Début de partie, rien d'acheté : meilleur départ parmi les choix courants
+  const bought = game.me.items.filter((id) => !TRINKETS.has(id));
+  if (game.gameTime < STARTER_WINDOW && !bought.length && mode.family !== 'arena') {
+    const cs = rec.champSelect({
+      champKey: champ.key,
+      role,
+      family: mode.family,
+      oppKey: opponent && opponent.champ ? opponent.champ.key : 0,
+      enemyKeys: enemies.map((e) => e.champ && e.champ.key).filter(Boolean),
+    });
+    const starters = startersVM(dd, cs.starts);
+    if (starters.length) vm.starters = starters;
+  }
   vm.roleInfo = { role, source: picked.source, champKey: champ.key, roles: !!mode.roles };
   vm.modeLabel = mode.label;
   return vm;
@@ -121,6 +138,14 @@ function computeChampSelect({ dd, store, rec, cs, hasKey, importHotkey, mode = n
   });
   const vm = champSelectVM({ dd, cs, rec: result, opponent, latestPatch: store.latestPatch(), hasKey, importHotkey, mode, roleSource: picked.source });
   vm.roleInfo = { role, source: picked.source, champKey: cs.myChampion.key, roles: !!mode.roles };
+  // de quoi écrire la page d'objets de la boutique (client LoL)
+  vm.itemSet = {
+    champKey: cs.myChampion.key,
+    map: mode.map,
+    starts: result.starts.map((s) => ({ ids: s.ids, share: s.share })),
+    core: result.core ? result.core.ids : [],
+    boots: result.boots ? result.boots.id : 0,
+  };
   vm.modeLabel = mode.label;
   return vm;
 }

@@ -201,6 +201,27 @@ function ingameVM({ dd, game, analysis, needs, rec, opponent, latestPatch, hasKe
   };
 }
 
+/**
+ * Choix de départ (début de partie, boutique) : jusqu'à 3 propositions, la meilleure en tête.
+ * "Meilleure" = la plus jouée par les meilleurs joueurs dans cette situation (poste, adversaire, compo).
+ */
+function startersVM(dd, starts) {
+  return (starts || [])
+    .filter((s) => s.share >= 0.05 || s === starts[0])
+    .slice(0, 3)
+    .map((s, i) => {
+      const counts = new Map();
+      for (const id of s.ids) counts.set(id, (counts.get(id) || 0) + 1);
+      return {
+        best: i === 0,
+        items: [...counts].map(([id, count]) => itemVM(dd, id, { count })).filter(Boolean),
+        share: pctInt(s.share),
+        wr: s.n >= 8 ? pctInt(s.wr) : null,
+      };
+    })
+    .filter((s) => s.items.length);
+}
+
 function runePageVM(dd, page) {
   const ru = page.ru;
   const prim = dd.style(ru[0]);
@@ -296,4 +317,4 @@ function messageVM(title, text) {
   return { mode: 'message', title, text };
 }
 
-module.exports = { ingameVM, champSelectVM, messageVM, runePageVM, hotkeyLabel, phaseLabel };
+module.exports = { ingameVM, champSelectVM, messageVM, runePageVM, hotkeyLabel, phaseLabel, startersVM };

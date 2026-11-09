@@ -255,6 +255,7 @@ function dashboardScenarios(data) {
     'accueil-maj-erreur': { page: 'home', state: S.dashboardState(data, { update: 'available-error' }) },
     'reglages-maj-prete': { page: 'settings', state: S.dashboardState(data, { update: 'ready' }) },
     'accueil-en-partie': { page: 'home', state: S.dashboardState(data, { live: { source: 'game', vm: vms['partie-faille'] }, phase: 'InProgress' }) },
+    'direct-debut': { page: 'live', state: S.dashboardState(data, { live: { source: 'game', vm: vms['partie-debut'] }, phase: 'InProgress' }) },
     'direct-partie': { page: 'live', state: S.dashboardState(data, { live: { source: 'game', vm: vms['partie-faille'] }, phase: 'InProgress' }) },
     'direct-hors-poste': { page: 'live', state: S.dashboardState(data, { live: { source: 'game', vm: vms['partie-hors-poste'] }, phase: 'InProgress' }) },
     'direct-aram': { page: 'live', state: S.dashboardState(data, { live: { source: 'game', vm: vms['partie-aram'] }, phase: 'InProgress' }) },
@@ -358,6 +359,7 @@ async function runShots() {
   const base = S.overlaySettings();
   const shots = {
     'overlay-partie': ['partie-faille', base],
+    'overlay-depart': ['partie-debut', base],
     'overlay-compact': ['partie-faille', { ...base, compact: true }],
     'overlay-hors-poste': ['partie-hors-poste', base],
     'overlay-aram': ['partie-aram', base],

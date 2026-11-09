@@ -156,6 +156,38 @@ class LcuClient {
     return r.ok && r.data && r.data.locale ? String(r.data.locale) : null;
   }
 
+  /**
+   * Page d'objets dans la boutique du jeu (onglet "Recommandés" : liste déroulante des pages d'objets).
+   * Une seule page BuildSense par champion ; les pages créées par le joueur ne sont jamais touchées.
+   * @param {{ title: string, champKey: number, map: number, blocks: { type: string, items: { id: number, count: number }[] }[] }} set
+   */
+  async writeItemSet(set) {
+    const me = await this.request('GET', '/lol-summoner/v1/current-summoner');
+    if (!me.ok || !me.data || !me.data.summonerId) return { ok: false, message: 'Client LoL introuvable.' };
+    const path = `/lol-item-sets/v1/item-sets/${me.data.summonerId}/sets`;
+    const cur = await this.request('GET', path);
+    if (!cur.ok) return { ok: false, message: 'Pages d’objets illisibles.' };
+    const data = cur.data && typeof cur.data === 'object' ? cur.data : {};
+    const others = (Array.isArray(data.itemSets) ? data.itemSets : []).filter((s) => !String(s.uid || '').startsWith('buildsense-'));
+    const ours = {
+      uid: `buildsense-${set.champKey}`,
+      title: set.title.slice(0, 75),
+      type: 'custom',
+      map: 'any',
+      mode: 'any',
+      priority: true,
+      sortrank: 0,
+      startedFrom: 'blank',
+      associatedChampions: [set.champKey],
+      associatedMaps: set.map ? [set.map] : [],
+      preferredItemSlots: [],
+      blocks: set.blocks.map((b) => ({ type: b.type, hideIfSummonerSpell: '', showIfSummonerSpell: '', items: b.items.map((i) => ({ id: String(i.id), count: i.count || 1 })) })),
+    };
+    const body = { accountId: data.accountId || me.data.accountId, itemSets: [ours, ...others], timestamp: Date.now() };
+    const put = await this.request('PUT', path, body);
+    return put.ok ? { ok: true } : { ok: false, message: `Page d’objets refusée par le client (${put.status}).` };
+  }
+
   /** Page de runes active (null si le client ne répond pas). */
   async currentPage() {
     const res = await this.request('GET', '/lol-perks/v1/currentpage');

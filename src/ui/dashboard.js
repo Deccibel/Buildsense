@@ -387,6 +387,7 @@ function renderSettingsExtras(s) {
   }
   if (document.activeElement !== sel) sel.value = cfg.language || 'auto';
   $('#autoRunes').checked = cfg.autoRunes !== false;
+  $('#autoItemSet').checked = cfg.autoItemSet !== false;
   $('#autoLivePage').checked = cfg.autoLivePage !== false;
 }
 
@@ -533,6 +534,23 @@ function lvSkills(sk) {
 function liveIngame(vm) {
   const left = [];
   const right = [];
+  if (vm.starters && vm.starters.length) {
+    left.push(
+      card(
+        'Départ',
+        'ouvre la boutique',
+        vm.starters.map((s) =>
+          h(
+            'div',
+            { class: `lv-start ${s.best ? 'best' : ''}` },
+            s.best ? h('span', { class: 'bubble' }, '★ Meilleur choix') : null,
+            h('div', { class: 'its' }, s.items.map((it) => h('span', { class: 'it' }, ico(it.icon, it.name), it.count > 1 ? h('span', { class: 'cnt' }, `×${it.count}`) : null))),
+            h('div', { class: 'nm' }, h('b', null, s.items.map((it) => it.name).join(' + ')), h('small', null, `${s.share} des parties${s.wr ? ` · ${s.wr} de victoires` : ''}`)),
+          ),
+        ),
+      ),
+    );
+  }
   if (vm.options.length) {
     left.push(
       card(
@@ -1052,6 +1070,7 @@ function bind() {
     showToast({ text: ok ? 'Dépôt des mises à jour enregistré.' : 'Format attendu : pseudo/nom-du-depot', level: ok ? 'ok' : 'warn' });
   });
   $('#autoRunes').addEventListener('change', (e) => saveConfig({ autoRunes: e.target.checked }));
+  $('#autoItemSet').addEventListener('change', (e) => saveConfig({ autoItemSet: e.target.checked }));
   $('#autoLivePage').addEventListener('change', (e) => saveConfig({ autoLivePage: e.target.checked }));
   $('#prefAdd').addEventListener('click', async () => {
     const k = $('#prefChamp').value;
