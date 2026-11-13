@@ -205,6 +205,11 @@ function versionLabel() {
 
 function setupUpdater(userData) {
   const current = PKG.version;
+  // passage d'une 1.6.x au canal bêta : l'adresse avait été forcée à la main ; le canal la remplace
+  const forced = S.config.get('updateFeed');
+  const repo = updateRepo();
+  if (forced && repo && forced === `https://github.com/${repo}/releases/download/beta/latest.json`) S.config.set({ updateFeed: null, updateChannel: 'beta' });
+  else if (forced && repo && forced === `https://github.com/${repo}/releases/latest/download/latest.json`) S.config.set({ updateFeed: null, updateChannel: 'stable' });
   S.updater = new Updater({
     currentVersion: current,
     feedUrl: updateFeed(),
