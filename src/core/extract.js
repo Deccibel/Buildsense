@@ -19,8 +19,9 @@ const POSITIONS = new Set(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
  *  fi objets finaux        sk ordre des compétences ("1213...")
  *  e  championKeys adverses   o  adversaire direct (même rôle)   a  alliés
  *  nt 1 = pas de timeline (ordre d'achat déduit des objets finaux)
+ *  pn Riot ID du joueur (Faille : parties Challenger/GM, pour l'onglet Builds)   pl rang (ex. "C1240" = Challenger 1240 LP)
  */
-function extractRecords(match, timeline, dd, { follow = null } = {}) {
+function extractRecords(match, timeline, dd, { follow = null, ranks = null } = {}) {
   const info = match && match.info;
   if (!info || !Array.isArray(info.participants)) return [];
   const family = familyOfQueue(info.queueId);
@@ -131,6 +132,11 @@ function extractRecords(match, timeline, dd, { follow = null } = {}) {
       a: allies.map((a) => a.championId),
     };
     if (!hasTimeline) rec.nt = 1;
+    if (family === 'sr' && p.riotIdGameName) {
+      rec.pn = `${p.riotIdGameName}#${p.riotIdTagline || ''}`;
+      const rk = ranks && p.puuid ? ranks.get(p.puuid) : null;
+      if (rk) rec.pl = rk;
+    }
     // joueur suivi (onglet Builds) : identifiant interne, jamais le puuid
     if (follow && p.puuid && follow.has(p.puuid)) rec.fp = follow.get(p.puuid);
     records.push(rec);

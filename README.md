@@ -2,9 +2,18 @@
 
 Overlay de builds pour League of Legends. Il récupère les builds des meilleurs joueurs (Faille classée Challenger/Grand Maître, ARAM, ARAM Mayhem, Arena) et les adapte en direct à ta partie : objets, bottes, runes, sorts, départ. L'appli se met à jour toute seule.
 
+## Télécharger
+
+| Version | Pour qui | Lien |
+|---|---|---|
+| **Stable** (recommandée) | Tout le monde. Une bêta devient stable le lendemain à 9 h, si aucun bug n'a été trouvé. | [Dernière version stable](https://github.com/Deccibel/buildsense/releases/latest) |
+| **Bêta** (`PG-AAAAMMJJ-bN`) | Pour tester les nouveautés dès qu'elles sont prêtes. | [Dernière bêta](https://github.com/Deccibel/buildsense/releases/tag/beta) · [installeur direct](https://github.com/Deccibel/buildsense/releases/download/beta/BuildSense-Setup-beta.exe) |
+
+Tu peux changer de canal à tout moment dans l'appli : **Réglages › Mises à jour › Stable / Bêta**. En Bêta, tu reçois aussi la version stable si elle est plus récente.
+
 ## Installation (Windows)
 
-1. Télécharge `BuildSense-Setup-x.y.z.exe` dans les [Releases](https://github.com/Deccibel/buildsense/releases/latest) et lance-le.
+1. Télécharge l'installeur (stable ou bêta, ci-dessus) et lance-le.
 2. Si Windows affiche « Windows a protégé votre ordinateur », clique sur **Informations complémentaires**, puis **Exécuter quand même** (l'exe n'est pas signé).
 3. L'installation ne demande pas de droits administrateur. Les mises à jour suivantes s'installent depuis l'appli, en un clic.
 
@@ -13,7 +22,7 @@ Overlay de builds pour League of Legends. Il récupère les builds des meilleurs
 1. **Clé API Riot** (Réglages) : copie ta *Development API Key* depuis [developer.riotgames.com](https://developer.riotgames.com), colle-la, puis clique sur **Enregistrer**. Elle expire toutes les 24 h, mais tu peux demander une *Personal API Key* qui, elle, n'expire pas.
 2. **Mes champions** : choisis tes champions, ils sont collectés en priorité. Tu peux aussi indiquer ton poste préféré pour chacun, par exemple Shen → Support.
 3. **Builds** (facultatif) : mets un build en favori pour un champion et un poste. Il sert de point de départ en partie. Tu peux aussi suivre un joueur (ex. Hide on bush#KR1) pour reprendre ses builds.
-4. **Dans LoL** : Options › Vidéo › **Fenêtré sans bordure**.
+4. **Dans LoL** : **Fenêtré sans bordure** ou **Plein écran** (avec les optimisations plein écran de Windows, actives par défaut). L'onglet Overlay de l'appli vérifie ton réglage et le corrige en 1 clic.
 
 ## Modes de jeu
 
@@ -51,7 +60,7 @@ Tu peux les changer dans l'onglet Overlay (n'importe quelle disposition de clavi
 
 ## Dépannage
 
-- **L'overlay n'apparaît pas** : vérifie que LoL est en Fenêtré sans bordure et que BuildSense tourne (icône près de l'horloge).
+- **L'overlay n'apparaît pas** : regarde l'onglet Overlay (mode d'affichage de LoL détecté, correction en 1 clic) et vérifie que BuildSense tourne (icône près de l'horloge). En plein écran exclusif (optimisations plein écran désactivées), aucune fenêtre ne peut passer devant le jeu.
 - **« Clé API refusée »** : ta clé de 24 h a expiré, colles-en une nouvelle.
 - **La sélection n'est pas détectée** : dans Réglages, indique le dossier de LoL (`C:\Riot Games\League of Legends` par défaut).
 - **Les runes ne s'appliquent pas** : sélectionne une page modifiable dans le client, puis appuie sur `Ctrl+Maj+R`.

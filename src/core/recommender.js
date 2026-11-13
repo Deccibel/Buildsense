@@ -69,6 +69,51 @@ function addTo(map, key, w, win) {
 
 const smoothWr = (v, k = 2) => (v.win + 0.5 * k) / (v.w + k);
 
+const median = (a) => {
+  if (!a.length) return null;
+  const s = a.slice().sort((x, y) => x - y);
+  return s[Math.floor(s.length / 2)];
+};
+
+/** "C1240" -> valeur comparable (Challenger > Grand Maître > Maître, puis LP). */
+const rankValue = (r) => {
+  if (!r) return -1;
+  const tier = { C: 3, G: 2, M: 1 }[r[0]] || 0;
+  return tier * 100000 + (Number(r.slice(1)) || 0);
+};
+
+const STAT_FR = {
+  ad: 'dégâts d’attaque',
+  ap: 'puissance',
+  armor: 'armure',
+  mr: 'résistance magique',
+  hp: 'PV',
+  as: 'vitesse d’attaque',
+  crit: 'coups critiques',
+  lethality: 'létalité',
+  armorPen: 'pénétration d’armure',
+  magicPen: 'pénétration magique',
+  lifesteal: 'vol de vie',
+  omnivamp: 'omnivampirisme',
+  haste: 'accélération de compétence',
+  ms: 'vitesse de déplacement',
+  hsp: 'soins et boucliers renforcés',
+  mana: 'mana',
+  tenacity: 'ténacité',
+};
+const FLAG_FR = {
+  antiHeal: 'Applique des blessures graves : réduit les soins adverses.',
+  shieldReaver: 'Perce les boucliers adverses.',
+  critReduction: 'Réduit les dégâts des coups critiques subis.',
+  cleanse: 'Permet de se libérer des contrôles.',
+  stasis: 'Stase : devient invulnérable un court instant.',
+  spellShield: 'Bouclier anti-sort : bloque une compétence.',
+  revive: 'Permet de revenir à la vie.',
+  pctHpDmg: 'Dégâts en % des PV : efficace contre les cibles résistantes.',
+  armorShred: 'Réduit l’armure des cibles.',
+};
+
+
 /** Ajoute une raison sans doublon (les boosts fusionnés contiennent "A · B"). */
 function addReason(o, reason) {
   for (const part of String(reason).split(' · ')) if (part && !o.reasons.includes(part)) o.reasons.push(part);
@@ -551,8 +596,33 @@ class Recommender {
    * Builds possibles pour un champion et un poste (onglet Builds) : les chemins d'objets les plus joués,
    * et ceux des joueurs suivis (ex. "Comme Hide on bush").
    */
-  buildVariants(champKey, role, { followed = [] } = {}) {
-    const prof = this.profile(champKey, role, 'sr');
+  buildVariants(champKey, role, { followed = [], family = 'sr' } = {}) {
+    const prof = this.profile(champKey, family === 'sr' ? role : '', family);
+    const groups = this.variantGroups(prof);
+    const total = [...groups.values()].reduce((s, g) => s + g.length, 0) || 1;
+    const noBoots = NO_BOOTS.has(family);
+    const out = [...groups.entries()]
+      .filter(([, g]) => g.length >= 3)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 5)
+      .map(([k, g], i) => {
+        const sum = this.summarize(g, k.split(',').map(Number));
+        if (noBoots) sum.boots = 0;
+        return { id: `core:${k}`, source: 'data', rank: i + 1, share: g.length / total, players: this.topPlayers(g, 2), ...sum };
+      });
+    if (family === 'sr') {
+      const all = this.store.byChampion(Number(champKey), 'sr');
+      for (const f of followed) {
+        const g = this.followedRecs(all, f.id, prof.role);
+        if (!g.length) continue;
+        out.push({ id: `player:${f.id}`, source: 'player', player: f.name, share: null, players: [], ...this.summarize(g) });
+      }
+    }
+    return { role: prof.role, mainRole: prof.mainRole, n: prof.n, family: prof.family, dataFamily: prof.dataFamily, variants: out };
+  }
+
+  /** Parties regroupées par chemin d'objets (3 premiers objets légendaires). */
+  variantGroups(prof) {
     const groups = new Map();
     for (const r of prof.recs) {
       const seq = this.legendarySeq(r);
@@ -561,19 +631,167 @@ class Recommender {
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     }
-    const total = [...groups.values()].reduce((s, g) => s + g.length, 0) || 1;
-    const out = [...groups.entries()]
-      .filter(([, g]) => g.length >= 3)
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 5)
-      .map(([k, g], i) => ({ id: `core:${k}`, source: 'data', rank: i + 1, share: g.length / total, ...this.summarize(g, k.split(',').map(Number)) }));
-    const all = this.store.byChampion(Number(champKey), 'sr');
-    for (const f of followed) {
-      const g = all.filter((r) => r.fp === f.id && (!prof.role || r.r === prof.role || all.filter((x) => x.fp === f.id).every((x) => x.r !== prof.role)));
-      if (!g.length) continue;
-      out.push({ id: `player:${f.id}`, source: 'player', player: f.name, share: null, ...this.summarize(g) });
+    return groups;
+  }
+
+  followedRecs(all, followId, role) {
+    const mine = all.filter((r) => r.fp === followId);
+    return mine.filter((r) => !role || r.r === role || mine.every((x) => x.r !== role));
+  }
+
+  /** Joueurs les plus représentés dans un groupe de parties (Riot ID + meilleur rang connu). */
+  topPlayers(recs, n = 5) {
+    const m = new Map();
+    for (const r of recs) {
+      if (!r.pn) continue;
+      const p = m.get(r.pn) || { name: r.pn, games: 0, wins: 0, rank: null };
+      p.games++;
+      p.wins += r.w ? 1 : 0;
+      if (r.pl && (!p.rank || rankValue(r.pl) > rankValue(p.rank))) p.rank = r.pl;
+      m.set(r.pn, p);
     }
-    return { role: prof.role, mainRole: prof.mainRole, n: prof.n, variants: out };
+    return [...m.values()].sort((a, b) => b.games - a.games || rankValue(b.rank) - rankValue(a.rank)).slice(0, n);
+  }
+
+  /**
+   * Détail d'un build (clic dans l'onglet Builds) : pour chaque case, l'objet, sa popularité, son taux
+   * de victoire et son timing, les alternatives et dans quelles parties elles sont préférées ;
+   * runes, sorts, départ, ordre des compétences et joueurs qui jouent ce build.
+   */
+  variantDetail(champKey, role, { family = 'sr', variantId = '', followed = [] } = {}) {
+    const prof = this.profile(champKey, family === 'sr' ? role : '', family);
+    let g = [];
+    let core = [];
+    if (variantId.startsWith('core:')) {
+      core = variantId.slice(5).split(',').map(Number);
+      g = this.variantGroups(prof).get(core.join(',')) || [];
+    } else if (variantId.startsWith('player:')) {
+      const f = followed.find((x) => `player:${x.id}` === variantId);
+      if (f) g = this.followedRecs(this.store.byChampion(Number(champKey), 'sr'), f.id, prof.role);
+    }
+    if (!g.length) return null;
+    const dd = this.dd;
+    const sum = this.summarize(g, core);
+    const noBoots = NO_BOOTS.has(family);
+    const minuteOf = (r, id) => {
+      const x = (r.co || []).find((c) => c[0] === id);
+      return x && x[1] > 0 ? x[1] : null;
+    };
+    const feats = (recs) => {
+      const acc = { ap: 0, heal: 0, tank: 0, cc: 0, n: 0 };
+      for (const r of recs) {
+        if (!r.e || r.e.length < 3) continue;
+        const f = this.featuresFor(r.e);
+        acc.ap += f.ap;
+        acc.heal += f.heal;
+        acc.tank += f.tank;
+        acc.cc += f.cc;
+        acc.n++;
+      }
+      if (!acc.n) return null;
+      return { ap: acc.ap / acc.n, heal: acc.heal / acc.n, tank: acc.tank / acc.n, cc: acc.cc / acc.n, n: acc.n };
+    };
+    const contextOf = (alt, base) => {
+      if (!alt || !base || alt.n < 5) return [];
+      const out = [];
+      const d = (k) => alt[k] - base[k];
+      if (d('ap') > 0.07) out.push('contre plus de dégâts magiques');
+      if (d('ap') < -0.07) out.push('contre plus de dégâts physiques');
+      if (d('heal') > 0.35) out.push('contre beaucoup de soins');
+      if (d('tank') > 0.35) out.push('contre des équipes plus résistantes (tanks)');
+      if (d('cc') > 0.4) out.push('contre beaucoup de contrôles');
+      return out;
+    };
+    // case par case : objet du build et alternatives (parties du champion avec les mêmes objets avant)
+    const slots = [];
+    for (let i = 0; i < Math.min(5, sum.items.length); i++) {
+      const id = sum.items[i];
+      const has = g.filter((r) => this.legendarySeq(r).includes(id));
+      const mins = has.map((r) => minuteOf(r, id)).filter((x) => x !== null);
+      const allAt = new Map();
+      for (const r of prof.recs) {
+        const seq = this.legendarySeq(r);
+        if (seq.length <= i || !sum.items.slice(0, i).every((x, j) => seq[j] === x)) continue;
+        const list = allAt.get(seq[i]) || [];
+        list.push(r);
+        allAt.set(seq[i], list);
+      }
+      const totalAt = [...allAt.values()].reduce((s, l) => s + l.length, 0) || 1;
+      const mainRecs = allAt.get(id) || [];
+      const base = feats(mainRecs.length ? mainRecs : has);
+      const alternatives = [...allAt.entries()]
+        .filter(([alt, l]) => alt !== id && l.length >= 3)
+        .sort((a, b) => b[1].length - a[1].length)
+        .slice(0, 3)
+        .map(([alt, l]) => ({
+          ...this.itemBrief(alt),
+          share: l.length / totalAt,
+          wr: smoothWr({ win: l.filter((r) => r.w).length, w: l.length }),
+          n: l.length,
+          when: contextOf(feats(l), base),
+        }));
+      const share = mainRecs.length / totalAt;
+      slots.push({
+        ...this.itemBrief(id),
+        share,
+        inBuild: has.length / g.length,
+        wr: smoothWr({ win: has.filter((r) => r.w).length, w: has.length || 1 }),
+        minute: median(mins),
+        why: this.itemWhy(id, { share, alternatives }),
+        alternatives,
+      });
+    }
+    const counts = (key) => {
+      const m = new Map();
+      for (const r of g) {
+        const k = key(r);
+        if (k) m.set(k, (m.get(k) || 0) + 1);
+      }
+      return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    };
+    const page = counts((r) => (r.ru && r.ru.length === 11 ? r.ru.join(',') : ''))[0];
+    const spells = counts((r) => (r.s && r.s.length === 2 ? r.s.slice().sort((a, b) => a - b).join(',') : ''))[0];
+    const start = counts((r) => (r.st && r.st.length ? r.st.slice().sort((a, b) => a - b).join(',') : ''))[0];
+    const boots = noBoots
+      ? []
+      : counts((r) => (r.co || []).map((x) => x[0]).find((id) => isBootsItem(dd, id)) || 0)
+          .slice(0, 3)
+          .map(([id, n]) => ({ ...this.itemBrief(Number(id)), share: n / g.length }));
+    return {
+      n: g.length,
+      wr: smoothWr({ win: g.filter((r) => r.w).length, w: g.length }),
+      duration: median(g.map((r) => r.d).filter(Boolean)),
+      slots,
+      boots,
+      runes: page ? { ids: page[0].split(',').map(Number), share: page[1] / g.length } : null,
+      spells: spells ? { ids: spells[0].split(',').map(Number), share: spells[1] / g.length } : null,
+      start: start ? { ids: start[0].split(',').map(Number), share: start[1] / g.length } : null,
+      skills: this.skillOrder({ recs: g }),
+      players: this.topPlayers(g, 6),
+      family: prof.family,
+      role: prof.role,
+    };
+  }
+
+  itemBrief(id) {
+    const it = this.dd.item(id);
+    return { id, name: it ? it.name : `#${id}`, icon: this.dd.itemIcon(id) };
+  }
+
+  /** Pourquoi cet objet : ce qu'il apporte (statistiques, effets) et sa place chez les meilleurs joueurs. */
+  itemWhy(id, { share = 0, alternatives = [] } = {}) {
+    const it = this.dd.item(id);
+    if (!it) return [];
+    const out = [];
+    const st = Object.keys(it.stats || {}).filter((k) => STAT_FR[k]).map((k) => STAT_FR[k]);
+    if (st.length) out.push(`Apporte : ${st.slice(0, 4).join(', ')}.`);
+    const f = it.flags || {};
+    for (const [k, txt] of Object.entries(FLAG_FR)) if (f[k]) out.push(txt);
+    if (share >= 0.5) out.push(`Choix très majoritaire à ce moment du build (${Math.round(share * 100)} % des parties).`);
+    else if (share > 0) out.push(`Choisi dans ${Math.round(share * 100)} % des parties à ce moment du build.`);
+    const sit = alternatives.filter((a) => a.when.length);
+    if (sit.length) out.push(`À remplacer selon la partie : ${sit.map((a) => `${a.name} ${a.when[0]}`).join(' ; ')}.`);
+    return out;
   }
 
   /** Départs sans bottes (ARAM) : les bottes sont retirées et les départs identiques regroupés. */

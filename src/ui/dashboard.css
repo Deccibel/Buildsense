@@ -2392,3 +2392,61 @@ kbd.live {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ---------------------------------------------------------------- 1.7 : analyse, détail des builds, canal */
+
+.callout .btn { margin-left: 6px; vertical-align: middle; }
+.callout.ok { background: rgba(61, 220, 132, 0.08); border-color: rgba(61, 220, 132, 0.3); color: var(--text); }
+.callout.warn { background: rgba(255, 93, 108, 0.08); border-color: rgba(255, 93, 108, 0.35); color: var(--text); }
+@media (prefers-color-scheme: light) { .callout { color: var(--text); } }
+
+.coach .co-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
+.co-stat { position: relative; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.co-stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.co-stat b { font-size: 20px; }
+.co-stat small { color: var(--muted); font-size: 11px; }
+.co-stat em { position: absolute; top: 8px; right: 10px; font-style: normal; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.co-stat.good { border-color: rgba(61, 220, 132, 0.45); }
+.co-stat.good em { color: var(--ok); }
+.co-stat.ok em { color: var(--warn); }
+.co-stat.bad { border-color: rgba(255, 93, 108, 0.45); }
+.co-stat.bad em { color: var(--danger); }
+.co-items { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.co-items .t, .bd-alts .t, .bd-row .t { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; min-width: 70px; }
+.co-item { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border-radius: 8px; background: var(--surface-2); }
+.co-item .ic, .bd-alt .ic, .bd-row .ic { width: 26px; height: 26px; border-radius: 6px; }
+.co-item small, .bd-alt small, .bd-row small { color: var(--muted); }
+.co-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
+@media (max-width: 860px) { .co-grid { grid-template-columns: 1fr; } }
+.co-col h4 { margin: 0 0 8px; font-size: 13px; }
+.co-col.good h4 { color: var(--ok); }
+.co-col.todo h4 { color: var(--warn); }
+.co-col ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.co-tip { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); margin-bottom: 8px; }
+.co-tip p { margin: 4px 0 8px; color: var(--muted); }
+.co-res { display: flex; flex-wrap: wrap; gap: 6px; }
+.co-res .btn.active { border-color: var(--accent); color: var(--accent); }
+.co-how { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+
+.b-click { cursor: pointer; border-radius: 10px; outline: none; }
+.b-click:hover .lv-path, .b-click:focus-visible .lv-path { filter: brightness(1.12); }
+.b-more { display: block; margin-top: 6px; font-size: 12px; color: var(--accent); }
+.b-var.open { border-color: var(--accent); }
+.tag.pro { background: rgba(245, 196, 81, 0.15); color: var(--gold); margin-left: 6px; }
+.tag.pro.maybe { opacity: 0.8; }
+.bd { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+.bd-slots { display: grid; gap: 8px; }
+.bd-slot { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.bd-item { display: flex; align-items: center; gap: 10px; }
+.bd-item .rk { width: 20px; color: var(--muted); font-weight: 800; text-align: center; }
+.bd-item small { display: block; color: var(--muted); }
+.bd-why { margin: 8px 0 0 30px; padding-left: 16px; display: grid; gap: 3px; font-size: 13px; }
+.bd-alts, .bd-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 0 30px; }
+.bd-row { margin-left: 0; }
+.bd-alt { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); font-size: 13px; }
+.bd-side { display: grid; gap: 6px; }
+.bd-players h4 { margin: 0 0 6px; font-size: 13px; }
+.bd-player { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.bd-player .pn small { color: var(--muted); margin-left: 2px; }
+.bd-player .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
+#updChannel { margin-bottom: 6px; }

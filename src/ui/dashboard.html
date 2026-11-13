@@ -112,7 +112,9 @@
           <h1>En direct</h1>
           <p>Ta sélection et ta partie en temps réel : pratique sur un second écran. L'overlay reste affiché par-dessus le jeu.</p>
         </header>
+        <div id="displayWarn"></div>
         <div id="liveView"></div>
+        <div id="coachView"></div>
         <label class="switch-row card slim">
           <span><b>Ouvrir cette page au début de chaque partie</b><small>Sans prendre le focus : ton jeu reste au premier plan</small></span>
           <span class="switch"><input type="checkbox" id="autoLivePage" /><i></i></span>
@@ -123,9 +125,10 @@
       <section class="page" id="page-builds" hidden>
         <header class="page-head">
           <h1>Builds</h1>
-          <p>Choisis un champion et un poste, puis mets un build en favori : il devient ton point de départ en partie. BuildSense l'adapte toujours à la compo adverse.</p>
+          <p>Choisis un mode, un champion et un poste. Clique sur un build pour voir qui le joue et pourquoi chaque objet est choisi. Mets-le en favori : il devient ton point de départ en partie (Faille).</p>
         </header>
         <div class="toolbar">
+          <div class="seg" id="bMode"></div>
           <select id="bChamp" class="search"></select>
           <div class="seg" id="bRole"></div>
         </div>
@@ -197,9 +200,7 @@
           <h1>Overlay</h1>
           <p>Il s'affiche tout seul pendant la sélection des champions et en partie. Les clics passent au travers, vers le jeu.</p>
         </header>
-        <div class="callout">
-          Mets LoL en <b>Fenêtré sans bordure</b> (Options › Vidéo › Mode fenêtre). En plein écran, rien ne peut s'afficher par-dessus le jeu.
-        </div>
+        <div id="displayBox"></div>
         <div class="grid2">
           <div class="card">
             <h3>Aperçu et position</h3>
@@ -328,6 +329,11 @@
 
         <div class="card" id="updatesBox">
           <h3>Mises à jour</h3>
+          <div class="seg" id="updChannel">
+            <button data-channel="stable">Stable</button>
+            <button data-channel="beta">Bêta</button>
+          </div>
+          <p class="muted small" id="updChannelHelp"></p>
           <p class="muted" id="updStatus"></p>
           <div class="upd-progress" id="updProgress" hidden><span></span></div>
           <div class="btns">

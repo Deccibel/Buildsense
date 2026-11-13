@@ -43,14 +43,60 @@ test('Collecte meta : parties de joueurs de chaque palier, fiches légères sans
   };
   const crawler = new Crawler({ api, store, dd, getConfig: () => ({ favorites: [], collectModes: { ...OFF, meta: true } }) });
   crawler.running = true;
-  for (let i = 0; i < 4; i++) await crawler.step();
+  // rotation : Platine et moins une étape sur deux, puis émeraude, diamant, maître
+  for (let i = 0; i < 6; i++) await crawler.step();
   const tiers = new Set(store.meta.map((r) => r.t));
   assert.deepEqual([...tiers].sort(), ['diamond', 'emerald', 'low', 'master']);
+  assert.equal(new Set(store.meta.filter((r) => r.t === 'low').map((r) => r.m)).size, 3, 'Platine et moins : 3 étapes sur 6');
   assert.ok(calls.some((c) => /entries:(PLATINUM|GOLD|SILVER|BRONZE|IRON)/.test(c)), 'Plat et moins : paliers bas');
   assert.ok(store.meta.every((r) => r.lt && !r.co), 'fiches légères');
   // les fiches meta ne servent jamais aux builds
   assert.equal(store.byChampion(match.info.participants[0].championId).length, 0);
-  assert.equal(crawler.status().families.meta.matchesAdded, 4);
+  assert.equal(crawler.status().families.meta.matchesAdded, 6);
+  assert.equal(crawler.status().metaLow.matches, 3);
+});
+
+test('Meta Platine et moins : collecteur dédié sur une autre région', async () => {
+  const store = new Store(null);
+  let n = 0;
+  const seen = [];
+  const api = {
+    requestCount: 0,
+    async leagueEntries(tier, div, page, platform) {
+      seen.push(`entries:${platform}`);
+      return [{ puuid: `p-${tier}` }, { puuid: `q-${tier}` }];
+    },
+    async matchIds(puuid, opts) {
+      seen.push(`ids:${opts.platform}:${opts.count}`);
+      return [`NA1_${n++}`, `NA1_${n++}`];
+    },
+    async match(id, platform) {
+      seen.push(`match:${platform}`);
+      const m = clone(match);
+      m.metadata.matchId = id;
+      return m;
+    },
+  };
+  const cfg = { platform: 'euw1', favorites: [], collectModes: { ...OFF, meta: true } };
+  const crawler = new Crawler({ api, store, dd, getConfig: () => cfg });
+  assert.deepEqual(crawler.extraMetaPlatforms(), ['na1', 'kr']);
+  crawler.running = true;
+  await crawler.metaLowStep('na1');
+  assert.ok(seen.includes('entries:na1') && seen.includes('ids:na1:2') && seen.includes('match:na1'));
+  assert.equal(new Set(store.meta.map((r) => r.m)).size, 2);
+  assert.ok(store.meta.every((r) => r.t === 'low'));
+  assert.equal(crawler.status().metaLow.byPlatform.na1, 2);
+  cfg.metaMultiRegion = false;
+  assert.deepEqual(crawler.extraMetaPlatforms(), []);
+});
+
+test('API Riot : un quota de requêtes par serveur (régions en parallèle)', () => {
+  const { RiotApi } = require('../src/core/riotApi');
+  const api = new RiotApi({ getKey: () => 'k', getPlatform: () => 'euw1' });
+  const a = api.limiterFor(api.hostOf('https://na1.api.riotgames.com/x'));
+  const b = api.limiterFor(api.hostOf('https://americas.api.riotgames.com/x'));
+  assert.notEqual(a, b);
+  assert.equal(api.limiterFor('na1.api.riotgames.com'), a);
 });
 
 test('Meta : % de pick et % de victoire par poste et par palier', () => {

@@ -2,6 +2,17 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 1.7.0
+
+- Démarrage instantané : la fenêtre s'ouvre tout de suite, les données se chargent en fond et Data Dragon part du cache (plus d'attente réseau).
+- Appli plus réactive : l'état n'est recalculé et renvoyé que s'il a changé, et plus du tout quand la fenêtre est cachée.
+- Overlay en Plein écran et en Sans bordure : premier plan réaffirmé plus souvent, détection du mode d'affichage de LoL et réglage en 1 clic (passage en sans bordure, réactivation des optimisations plein écran de Windows).
+- Dossier de LoL détecté automatiquement (installations sur D:, E:…).
+- En direct : analyse de ta partie (farm, morts, vision, participation, or gardé, timing des objets), ce qui est améliorable et comment, avec des tutos vidéo et des fiches écrites. Ta dernière partie reste consultable.
+- Builds : choix du mode de jeu (Faille, ARAM, ARAM Mayhem, Arena) et clic sur un build pour son détail : pourquoi chaque objet, alternatives et quand les prendre, runes, sorts, départ, compétences, joueurs qui le jouent (rang, pros reconnus).
+- Meta Platine et moins : collecte dédiée en parallèle sur d'autres régions (quotas Riot séparés) et palier prioritaire dans ta région.
+- Mises à jour : canal Bêta (versions « PG-date-bN », dès qu'elles sont prêtes) ou Stable (la bêta devient stable le lendemain à 9 h).
+
 ## 1.6.0
 
 - Overlay : build complet de 6 objets (bottes + 5 objets), adapté à la partie, objets de situation signalés.

@@ -122,18 +122,13 @@ class Updater extends EventEmitter {
     if (prev !== 'downloading' && prev !== 'ready') this.set({ status: 'checking', error: null });
     this.busy = (async () => {
       try {
-        const sep = this.feedUrl.includes('?') ? '&' : '?';
-        const res = await withTimeout(this.fetch(`${this.feedUrl}${sep}t=${Date.now()}`, { cache: 'no-store' }), 20000, 'Vérification');
-        if (res.status === 404) {
+        const m = await this.fetchBest();
+        if (!m) {
           // dépôt sans version publiée : rien de plus récent
           this.manifest = null;
           this.set({ status: 'up-to-date', latest: null, notes: [], error: null, checkedAt: Date.now() });
           return;
         }
-        if (!res.ok) throw new Error(`serveur de mises à jour : erreur ${res.status}`);
-        const m = await res.json();
-        const err = manifestError(m, this.feedUrl);
-        if (err) throw new Error(err);
         const newer = compareVersions(m.version, this.currentVersion) > 0;
         if (!newer) {
           this.manifest = null;
@@ -166,6 +161,42 @@ class Updater extends EventEmitter {
       this.busy = null;
     }
     return this.status();
+  }
+
+  /**
+   * Lit le(s) latest.json. Canal bêta : deux sources (bêta et stable), on garde la version la plus récente.
+   * Renvoie le manifeste (avec .channel) ou null si rien n'est publié ; lève une erreur si tout a échoué.
+   */
+  async fetchBest() {
+    const feeds = Array.isArray(this.extraFeeds) && this.extraFeeds.length ? [this.feedUrl, ...this.extraFeeds] : [this.feedUrl];
+    let best = null;
+    let lastErr = null;
+    let anyOk = false;
+    for (const feed of feeds) {
+      try {
+        const sep = feed.includes('?') ? '&' : '?';
+        const res = await withTimeout(this.fetch(`${feed}${sep}t=${Date.now()}`, { cache: 'no-store' }), 20000, 'Vérification');
+        if (res.status === 404) {
+          anyOk = true;
+          continue;
+        }
+        if (!res.ok) throw new Error(`serveur de mises à jour : erreur ${res.status}`);
+        const m = await res.json();
+        const err = manifestError(m, feed);
+        if (err) throw new Error(err);
+        anyOk = true;
+        if (!best || compareVersions(m.version, best.version) > 0) best = m;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!anyOk && lastErr) throw lastErr;
+    return best;
+  }
+
+  /** Sources supplémentaires (canal bêta : la source stable en plus). */
+  setExtraFeeds(list) {
+    this.extraFeeds = (list || []).filter(Boolean);
   }
 
   /** Change la source des mises à jour (réglages). */

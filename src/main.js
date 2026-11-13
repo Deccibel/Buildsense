@@ -18,8 +18,11 @@ const { ROLE_LABELS } = require('./core/util');
 const { IconCache, DEFAULT_REMOTE } = require('./core/iconCache');
 const { detectMode, FAMILY_IDS } = require('./core/modes');
 const { Updater, compareVersions } = require('./core/updater');
-const { buildsView: pageBuilds, metaView: pageMeta } = require('./core/pageViews');
+const { buildsView: pageBuilds, metaView: pageMeta, buildDetailView } = require('./core/pageViews');
+const { Pros } = require('./core/pros');
 const { spawn } = require('child_process');
+const gameWindow = require('./core/gameWindow');
+const { GameCoach } = require('./core/coach');
 
 const OVERLAY_WIDTH = 340;
 const ROOT = path.join(__dirname, '..');
@@ -80,6 +83,10 @@ protocol.registerSchemesAsPrivileged([
 
 // ---------------------------------------------------------------- démarrage
 
+// développement : dossier de données séparé (une version installée peut tourner en même temps)
+if (process.env.BUILDSENSE_USERDATA) app.setPath('userData', process.env.BUILDSENSE_USERDATA);
+const T0 = Date.now();
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -101,7 +108,8 @@ async function init() {
   const userData = app.getPath('userData');
   S.config = new Config(userData);
   S.dd = new DDragon({ cacheDir: path.join(userData, 'cache'), language: effectiveLanguage() });
-  S.store = new Store(path.join(userData, 'data')).load();
+  // les données (plusieurs dizaines de Mo) se chargent en fond : la fenêtre s'affiche tout de suite
+  S.store = new Store(path.join(userData, 'data'));
   S.rec = new Recommender({ store: S.store, dd: S.dd });
   S.api = new RiotApi({
     getKey: () => S.config.get('apiKey'),
@@ -123,9 +131,20 @@ async function init() {
     pushStateSoon();
   });
   S.store.on('change', () => pushStateSoon());
+  const lp = gameWindow.detectLeaguePath(S.config.get('leaguePath'));
+  if (lp !== S.config.get('leaguePath')) S.config.set({ leaguePath: lp });
   S.lcu = new LcuClient({ getLeaguePath: () => S.config.get('leaguePath') });
   setupIcons(userData);
   setupUpdater(userData);
+  S.coach = new GameCoach();
+  S.pros = new Pros({ cacheFile: path.join(userData, 'cache', 'pros.json'), fetchImpl: (url, opts) => net.fetch(url, opts) });
+  setTimeout(() => S.pros.refresh(), 8000);
+  S.lastGameFile = path.join(userData, 'last-game.json');
+  try {
+    S.lastGame = JSON.parse(fs.readFileSync(S.lastGameFile, 'utf8'));
+  } catch {
+    S.lastGame = null;
+  }
   nativeTheme.themeSource = THEMES[S.config.get('appearance').theme] || 'dark';
 
   createMainWindow();
@@ -135,6 +154,12 @@ async function init() {
   registerIpc();
 
   loadDDragon();
+  S.store.loadAsync().then(() => {
+    S.rec.profiles.clear();
+    startCrawlerIfPossible();
+    pushState();
+  });
+  displayTick();
   liveTick();
   lcuTick();
   overlayOnTopTick();
@@ -152,12 +177,30 @@ function updateRepo() {
   return REPO_RE.test(r) ? r : '';
 }
 
-/** Adresse du fichier latest.json (la dernière version publiée du dépôt). */
-function updateFeed() {
+/**
+ * Adresse du fichier latest.json.
+ *  - stable : la dernière version publiée (GitHub "latest", promue chaque jour à 9 h) ;
+ *  - bêta : la release "beta" du dépôt, mise à jour dès qu'une bêta est publiée.
+ */
+function updateFeed(channel = S.config.get('updateChannel')) {
   const custom = S.config.get('updateFeed');
   if (custom) return custom;
   const repo = updateRepo();
-  return repo ? `https://github.com/${repo}/releases/latest/download/latest.json` : null;
+  if (!repo) return null;
+  return channel === 'beta'
+    ? `https://github.com/${repo}/releases/download/beta/latest.json`
+    : `https://github.com/${repo}/releases/latest/download/latest.json`;
+}
+
+/** Canal bêta : on regarde aussi la version stable (si elle est plus récente, on la prend). */
+function extraFeeds() {
+  return S.config.get('updateChannel') === 'beta' && !S.config.get('updateFeed') ? [updateFeed('stable')] : [];
+}
+
+/** Nom affiché de la version : "PG-AAAAMMJJ-bN" pour une bêta, sinon le numéro. */
+function versionLabel() {
+  const b = PKG.buildsense || {};
+  return b.channel === 'beta' && b.betaName ? `${b.betaName} (${PKG.version})` : PKG.version;
 }
 
 function setupUpdater(userData) {
@@ -168,6 +211,7 @@ function setupUpdater(userData) {
     fetchImpl: (url, opts) => net.fetch(url, opts),
     downloadDir: path.join(userData, 'updates'),
   });
+  S.updater.setExtraFeeds(extraFeeds());
   S.updater.cleanup();
   let trayStatus = null;
   S.updater.on('change', (st) => {
@@ -341,6 +385,20 @@ async function applyLanguage() {
 }
 
 async function loadDDragon() {
+  // démarrage instantané depuis le cache ; la vérification du patch en ligne suit en fond
+  if (!S.dd.ready) {
+    S.dd.language = effectiveLanguage();
+    if (S.dd.loadCached()) {
+      S.ddError = null;
+      startCrawlerIfPossible();
+      pushState();
+      setTimeout(async () => {
+        await refreshDDragon();
+        prefetchIcons();
+      }, 2500);
+      return;
+    }
+  }
   await ddTask(async () => {
     try {
       S.dd.language = effectiveLanguage();
@@ -357,7 +415,7 @@ async function loadDDragon() {
 }
 
 function startCrawlerIfPossible() {
-  if (S.dd.ready && S.config.get('apiKey') && S.config.get('crawlerEnabled')) S.crawler.start();
+  if (S.dd.ready && S.store.loaded && S.config.get('apiKey') && S.config.get('crawlerEnabled')) S.crawler.start();
 }
 
 // ---------------------------------------------------------------- fenêtres
@@ -375,12 +433,76 @@ function createMainWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   S.mainWin.loadFile(path.join(__dirname, 'ui', 'dashboard.html'));
+  S.mainWin.webContents.once('did-finish-load', () => {
+    if (process.env.BUILDSENSE_TIMING) console.log(`[timing] fenêtre affichée en ${Date.now() - T0} ms`);
+    if (process.env.BUILDSENSE_SHOTS) devShots(process.env.BUILDSENSE_SHOTS);
+  });
+  S.mainWin.on('show', () => {
+    if (S.stateDirty) pushState(true);
+  });
   S.mainWin.on('close', (e) => {
     if (!S.quitting) {
       e.preventDefault();
       S.mainWin.hide();
     }
   });
+}
+
+/** Développement : captures des pages principales (BUILDSENSE_SHOTS=dossier). */
+async function devShots(dir) {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  fs.mkdirSync(dir, { recursive: true });
+  const w = S.mainWin;
+  const shot = async (name) => {
+    const img = await w.webContents.capturePage();
+    fs.writeFileSync(path.join(dir, `${name}.png`), img.toPNG());
+  };
+  const js = (code) => w.webContents.executeJavaScript(code);
+  await wait(4000);
+  while (!S.store.loaded) await wait(300);
+  if (process.env.BUILDSENSE_TIMING) console.log(`[timing] données chargées en ${Date.now() - T0} ms`);
+  await shot('home');
+  setDemo('ingame');
+  await wait(800);
+  await js("document.querySelector('[data-page=live]').click()");
+  await wait(800);
+  await shot('live');
+  await js("document.querySelector('main').scrollTop = 99999");
+  await wait(300);
+  await shot('live-coach');
+  await js("document.querySelector('.co-res .btn:last-child') && document.querySelector('.co-res .btn:last-child').click()");
+  await wait(300);
+  await shot('live-coach-guide');
+  setDemo(null);
+  await js("document.querySelector('[data-page=builds]').click()");
+  await wait(1500);
+  await js("(() => { const s = document.querySelector('#bChamp'); s.value = '98'; s.dispatchEvent(new Event('change')); })()");
+  await wait(1200);
+  await js("document.querySelector('.b-click') && document.querySelector('.b-click').click()");
+  await wait(1200);
+  await shot('builds-detail');
+  await js("document.querySelector('main').scrollTop = 600");
+  await wait(300);
+  await shot('builds-detail-2');
+  await js("document.querySelector('#bMode [data-family=aram]').click()");
+  await wait(1200);
+  await shot('builds-aram');
+  await js("document.querySelector('[data-page=meta]').click()");
+  await wait(800);
+  await js("document.querySelector('#mTier [data-tier=low]').click()");
+  await wait(800);
+  await shot('meta-low');
+  await js("document.querySelector('[data-page=overlay]').click()");
+  await wait(600);
+  await shot('overlay');
+  await js("document.querySelector('[data-page=settings]').click()");
+  await wait(600);
+  await js("document.querySelector('#updatesBox').scrollIntoView()");
+  await wait(300);
+  await shot('settings-updates');
+  console.log('[shots] ok');
+  S.quitting = true;
+  app.quit();
 }
 
 function showMain() {
@@ -453,7 +575,8 @@ function createOverlay() {
 function keepOverlayOnTop() {
   const w = S.overlayWin;
   if (w && w.isVisible()) {
-    w.setAlwaysOnTop(true, 'screen-saver');
+    // niveau le plus haut (au-dessus du jeu en sans bordure et en plein écran optimisé par Windows)
+    w.setAlwaysOnTop(true, 'screen-saver', 1);
     w.moveTop();
   }
 }
@@ -463,13 +586,15 @@ function overlayOnTopTick() {
   const inGame = S.live.inGame || S.champSelect.active || !!S.demo;
   const boost = Date.now() < (S.onTopBoostUntil || 0);
   if (inGame) keepOverlayOnTop();
-  setTimeout(overlayOnTopTick, boost ? 1000 : inGame ? 2000 : 4000);
+  // plein écran : le jeu reprend le premier plan plus souvent, on réaffirme plus vite
+  const fast = boost || (S.display && S.display.windowMode === 'fullscreen' && S.live.inGame);
+  setTimeout(overlayOnTopTick, fast ? 500 : inGame ? 1000 : 4000);
 }
 
 function createTray() {
   const img = nativeImage.createFromPath(path.join(ROOT, 'assets', 'tray.png'));
   S.tray = new Tray(img);
-  S.tray.setToolTip(`BuildSense ${PKG.version}`);
+  S.tray.setToolTip(`BuildSense ${versionLabel()}`);
   buildTrayMenu();
   S.tray.on('click', showMain);
 }
@@ -597,6 +722,22 @@ function resizeOverlay(cssHeight) {
 function toast(text, level = 'info') {
   if (S.overlayWin) S.overlayWin.webContents.send('overlay:toast', { text, level });
   if (S.mainWin) S.mainWin.webContents.send('toast', { text, level });
+}
+
+// ---------------------------------------------------------------- mode d'affichage du jeu
+
+/** Plein écran / sans bordure / fenêtré, et optimisations plein écran de Windows (toutes les 20 s). */
+async function displayTick() {
+  try {
+    const d = await gameWindow.displayInfo(S.config.get('leaguePath'));
+    if (JSON.stringify(d) !== JSON.stringify(S.display)) {
+      S.display = d;
+      pushStateSoon();
+    }
+  } catch {
+    /* non bloquant */
+  }
+  setTimeout(displayTick, 20000);
 }
 
 // ---------------------------------------------------------------- boucles
@@ -832,10 +973,14 @@ async function liveTick() {
           S.activeFamily = mode.family;
           S.live.game = game;
           S.live.vm = computeLive(game, mode);
+          updateCoach(game, mode);
         }
       }
     } else {
-      if (S.live.inGame) S.roleOverride = null; // fin de partie : le choix de poste ne vaut que pour elle
+      if (S.live.inGame) {
+        S.roleOverride = null; // fin de partie : le choix de poste ne vaut que pour elle
+        finishCoach();
+      }
       S.live.inGame = false;
       S.live.vm = null;
       S.live.unsupported = null;
@@ -850,6 +995,49 @@ async function liveTick() {
   refreshOverlay();
   pushStateSoon();
   setTimeout(liveTick, delay);
+}
+
+// ---------------------------------------------------------------- analyse de la partie (onglet En direct)
+
+function coachContext(game, mode) {
+  const vm = S.live.vm;
+  const role = vm && vm.roleInfo ? vm.roleInfo.role : '';
+  const family = mode ? mode.family : 'sr';
+  const champ = game.me.champ;
+  return { dd: S.dd, prof: champ ? S.rec.profile(champ.key, role, family) : null, role, champion: champ ? champ.name : '', family };
+}
+
+function updateCoach(game, mode) {
+  if (!S.coach) return;
+  S.coach.update(game, S.dd);
+  S.coachMode = mode;
+  // le rapport se recalcule toutes les 5 s (il change peu d'une seconde à l'autre)
+  if (!S.coachAt || Date.now() - S.coachAt > 5000) {
+    S.coachAt = Date.now();
+    try {
+      S.coachReport = S.coach.report(coachContext(game, mode));
+    } catch (e) {
+      console.error('[coach]', e);
+    }
+  }
+}
+
+/** Fin de partie : le dernier rapport devient « Ta dernière partie » (gardé sur le disque). */
+function finishCoach() {
+  if (!S.coach || !S.coach.last) return;
+  try {
+    const rep = S.coach.report({ ...coachContext(S.coach.last, S.coachMode), final: true });
+    if (rep && rep.minutes >= 5) {
+      rep.endedAt = Date.now();
+      S.lastGame = rep;
+      fs.writeFile(S.lastGameFile, JSON.stringify(rep), () => {});
+    }
+  } catch (e) {
+    console.error('[coach]', e);
+  }
+  S.coach.reset();
+  S.coachReport = null;
+  S.coachAt = 0;
 }
 
 /** Langue du client LoL : lue une fois par session du client. */
@@ -931,6 +1119,7 @@ function setDemo(kind, { keepOverride = false } = {}) {
   if (!keepOverride) S.roleOverride = null;
   S.demo = DEMOS[kind] ? kind : null;
   S.demoVm = null;
+  S.demoCoach = null;
   const hasKey = !!S.config.get('apiKey');
   if (S.demo && !S.dd.ready) {
     S.demoVm = messageVM('Démo indisponible', 'Les données du jeu (Data Dragon) ne sont pas encore chargées.');
@@ -943,6 +1132,13 @@ function setDemo(kind, { keepOverride = false } = {}) {
     } else {
       const game = normalizeLive(raw, S.dd);
       S.demoVm = game ? computeLive(game, null) : messageVM('Démo', 'Partie de démo illisible.');
+      if (game) {
+        const c = new GameCoach();
+        c.update(game, S.dd);
+        const mode = detectMode({ gameMode: game.gameMode, mapNumber: game.mapNumber });
+        const role = S.demoVm && S.demoVm.roleInfo ? S.demoVm.roleInfo.role : '';
+        S.demoCoach = c.report({ dd: S.dd, prof: game.me.champ ? S.rec.profile(game.me.champ.key, role, mode.family) : null, role, champion: game.me.champ ? game.me.champ.name : '', family: mode.family });
+      }
     }
   }
   if (S.demo) S.userHidden = false;
@@ -1038,9 +1234,12 @@ function registerHotkeys() {
 
 // ---------------------------------------------------------------- état pour la fenêtre principale
 
-function buildsView(champKey, role) {
+const BUILD_FAMILIES = ['sr', 'aram', 'mayhem', 'arena'];
+
+function buildsView(champKey, role, family = 'sr') {
   if (!S.dd.ready) return null;
-  return pageBuilds({ dd: S.dd, rec: S.rec, followed: S.config.get('followed'), presets: S.config.get('buildPresets') }, champKey, role);
+  const fam = BUILD_FAMILIES.includes(family) ? family : 'sr';
+  return pageBuilds({ dd: S.dd, rec: S.rec, followed: S.config.get('followed'), presets: S.config.get('buildPresets'), pros: S.pros }, champKey, role, fam);
 }
 
 function metaView(tier) {
@@ -1054,6 +1253,7 @@ function fullState() {
     platforms: PLATFORMS,
     dd: { ready: S.dd.ready, version: S.dd.version, error: S.ddError, language: S.dd.language },
     clientLocale: S.clientLocale,
+    display: S.display || null,
     icons: S.iconStatus,
     crawler: S.crawler.status(),
     store: S.store.stats(),
@@ -1070,8 +1270,11 @@ function fullState() {
       role: currentRoleInfo(),
     },
     live: liveView(),
+    coach: S.demo && S.demoCoach ? { ...S.demoCoach, demo: true } : S.live.inGame && S.coachReport ? S.coachReport : S.lastGame || null,
     followed: (cfg.followed || []).map((f) => ({ ...f, found: S.followStatus ? S.followStatus[f.id] : undefined })),
     version: PKG.version,
+    versionLabel: versionLabel(),
+    build: { channel: (PKG.buildsense && PKG.buildsense.channel) || 'stable', betaName: (PKG.buildsense && PKG.buildsense.betaName) || null },
     update: S.updater
       ? {
           ...S.updater.status(),
@@ -1094,9 +1297,20 @@ function fullState() {
   };
 }
 
-function pushState() {
+function pushState(force = false) {
   S.lastStatePush = Date.now();
-  if (S.mainWin && !S.mainWin.isDestroyed()) S.mainWin.webContents.send('state', fullState());
+  if (!S.mainWin || S.mainWin.isDestroyed()) return;
+  // fenêtre cachée (zone de notification) : rien à redessiner, l'état est envoyé à la réouverture
+  if (!force && !S.mainWin.isVisible()) {
+    S.stateDirty = true;
+    return;
+  }
+  const st = fullState();
+  const json = JSON.stringify(st);
+  if (!force && json === S.lastStateJson) return;
+  S.lastStateJson = json;
+  S.stateDirty = false;
+  S.mainWin.webContents.send('state', st);
 }
 
 function pushStateSoon() {
@@ -1113,7 +1327,8 @@ function sanitizeConfig(patch) {
   if (typeof patch.apiKey === 'string') out.apiKey = patch.apiKey.trim();
   if (PLATFORMS.includes(patch.platform)) out.platform = patch.platform;
   if (Array.isArray(patch.favorites)) out.favorites = [...new Set(patch.favorites.map(Number).filter((n) => n > 0))].slice(0, 20);
-  for (const k of ['crawlerEnabled', 'pauseCrawlerInGame', 'lcuEnabled', 'autoRunes', 'autoItemSet', 'autoLivePage', 'autoUpdate']) if (typeof patch[k] === 'boolean') out[k] = patch[k];
+  for (const k of ['crawlerEnabled', 'pauseCrawlerInGame', 'lcuEnabled', 'autoRunes', 'autoItemSet', 'autoLivePage', 'autoUpdate', 'metaMultiRegion']) if (typeof patch[k] === 'boolean') out[k] = patch[k];
+  if (patch.updateChannel === 'stable' || patch.updateChannel === 'beta') out.updateChannel = patch.updateChannel;
   if (patch.rolePrefs && typeof patch.rolePrefs === 'object') {
     // '' = automatique (la fusion des réglages ne supprime pas les clés)
     out.rolePrefs = {};
@@ -1169,9 +1384,15 @@ function registerIpc() {
       refreshOverlay();
     }
     if (p.appearance) applyAppearance();
-    if ('updateRepo' in p && S.updater) {
+    if (('updateRepo' in p || 'updateChannel' in p) && S.updater) {
       S.updater.setFeed(updateFeed());
+      S.updater.setExtraFeeds(extraFeeds());
+      S.config.set({ dismissedUpdate: null });
       checkUpdates();
+    }
+    if (('metaMultiRegion' in p || p.collectModes) && S.crawler.running) {
+      S.crawler.stopMetaWorkers();
+      S.crawler.startMetaWorkers();
     }
     if (p.autoUpdate) maybeAutoDownload();
     if ('rolePrefs' in p || 'autoRunes' in p) recomputeViews();
@@ -1241,7 +1462,12 @@ function registerIpc() {
     return true;
   });
 
-  ipcMain.handle('builds:get', (_e, { champKey, role } = {}) => buildsView(Number(champKey), normRole(role)));
+  ipcMain.handle('builds:get', (_e, { champKey, role, family } = {}) => buildsView(Number(champKey), normRole(role), String(family || 'sr')));
+  ipcMain.handle('builds:detail', (_e, { champKey, role, family, variantId } = {}) => {
+    if (!S.dd.ready) return null;
+    const fam = BUILD_FAMILIES.includes(family) ? family : 'sr';
+    return buildDetailView({ dd: S.dd, rec: S.rec, followed: S.config.get('followed'), pros: S.pros }, Number(champKey), normRole(role), fam, String(variantId || ''));
+  });
   ipcMain.handle('builds:favorite', (_e, { champKey, role, items, label } = {}) => {
     const key = `${Number(champKey)}|${normRole(role)}`;
     const ok = Array.isArray(items) && items.length && items.every((x) => Number.isInteger(x) && S.dd.item(x));
@@ -1315,6 +1541,31 @@ function registerIpc() {
 
   ipcMain.handle('link:open', (_e, which) => {
     if (LINKS[which]) shell.openExternal(LINKS[which]);
+  });
+  // tutos (onglet En direct) : seulement des adresses https de sites connus
+  ipcMain.handle('link:url', (_e, url) => {
+    try {
+      const u = new URL(String(url));
+      const okHost = /(^|\.)(youtube\.com|youtu\.be|leagueoflegends\.com|riotgames\.com)$/i.test(u.hostname);
+      if (u.protocol === 'https:' && okHost) shell.openExternal(u.toString());
+    } catch {
+      /* adresse refusée */
+    }
+  });
+  ipcMain.handle('game:setBorderless', async () => {
+    if (S.live.inGame) return { ok: false, message: 'Termine ta partie : le mode d’affichage se change hors partie.' };
+    const ok = gameWindow.setWindowMode(S.config.get('leaguePath'), 2);
+    S.display = await gameWindow.displayInfo(S.config.get('leaguePath'));
+    pushState(true);
+    return ok
+      ? { ok: true, message: 'LoL passera en Fenêtré sans bordure à ta prochaine partie.' }
+      : { ok: false, message: 'Fichiers de réglages de LoL introuvables : vérifie le dossier de LoL dans Réglages.' };
+  });
+  ipcMain.handle('game:fixFso', async () => {
+    const r = await gameWindow.fixFso();
+    S.display = await gameWindow.displayInfo(S.config.get('leaguePath'));
+    pushState(true);
+    return r.fixed ? { ok: true, message: 'Optimisations plein écran réactivées pour LoL.' } : { ok: false, message: 'Rien à corriger.' };
   });
 
   ipcMain.on('overlay:height', (_e, h) => resizeOverlay(Number(h)));

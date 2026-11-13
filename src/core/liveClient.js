@@ -60,6 +60,7 @@ function normalizeLive(raw, dd) {
     level: p.level || 1,
     items: (p.items || []).map((i) => i.itemID).filter(Boolean),
     scores: p.scores || {},
+    isDead: !!p.isDead,
     isMe: p === meRaw,
   });
   const players = raw.allPlayers.map(toPlayer);

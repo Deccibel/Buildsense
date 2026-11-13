@@ -30,6 +30,67 @@ class Store extends EventEmitter {
     this.familyCounts = new Map();
     this.version = 0;
     this.pendingSeen = 0;
+    this.loaded = false;
+    this.statsCache = null;
+  }
+
+  /**
+   * Chargement sans bloquer l'appli : le fichier est lu par morceaux et le processus principal
+   * reprend la main régulièrement (fenêtres, overlay et raccourcis restent réactifs).
+   */
+  async loadAsync({ chunkLines = 15000 } = {}) {
+    if (!this.dir) {
+      this.loaded = true;
+      return this;
+    }
+    fs.mkdirSync(this.dir, { recursive: true });
+    const yieldNow = () => new Promise((r) => setImmediate(r));
+    try {
+      const fd = await fs.promises.open(this.recordsFile, 'r');
+      try {
+        const buf = Buffer.allocUnsafe(4 * 1024 * 1024);
+        let rest = '';
+        let n = 0;
+        for (;;) {
+          const { bytesRead } = await fd.read(buf, 0, buf.length, null);
+          if (!bytesRead) break;
+          const text = rest + buf.toString('utf8', 0, bytesRead);
+          const lines = text.split('\n');
+          rest = lines.pop();
+          for (const line of lines) {
+            if (!line) continue;
+            try {
+              this.index(JSON.parse(line));
+            } catch {
+              /* ligne corrompue ignorée */
+            }
+            if (++n % chunkLines === 0) await yieldNow();
+          }
+        }
+        if (rest.trim()) {
+          try {
+            this.index(JSON.parse(rest));
+          } catch {
+            /* fin de fichier tronquée */
+          }
+        }
+      } finally {
+        await fd.close();
+      }
+    } catch {
+      /* pas encore de données */
+    }
+    try {
+      for (const id of JSON.parse(await fs.promises.readFile(this.seenFile, 'utf8'))) this.seen.add(id);
+    } catch {
+      /* rien */
+    }
+    await yieldNow();
+    this.prune();
+    this.loaded = true;
+    this.version++;
+    this.emit('change');
+    return this;
   }
 
   load() {
@@ -54,6 +115,7 @@ class Store extends EventEmitter {
       /* rien */
     }
     this.prune();
+    this.loaded = true;
     this.version++;
     return this;
   }
@@ -169,7 +231,17 @@ class Store extends EventEmitter {
     return best;
   }
 
+  /** Statistiques de la base (mises en cache : recalculées seulement quand la base change). */
   stats() {
+    const c = this.statsCache;
+    // pendant la collecte la base change sans arrêt : au plus un recalcul toutes les 4 s
+    if (c && (c.version === this.version || (c.loaded === this.loaded && Date.now() - c.at < 4000))) return c.value;
+    const value = this.computeStats();
+    this.statsCache = { version: this.version, value, at: Date.now(), loaded: this.loaded };
+    return value;
+  }
+
+  computeStats() {
     const matches = new Set();
     const byFamily = {};
     for (const r of this.records) {
@@ -192,6 +264,7 @@ class Store extends EventEmitter {
       patches: this.patches(),
       latestPatch: this.latestPatch(),
       byFamily,
+      loaded: this.loaded,
     };
   }
 

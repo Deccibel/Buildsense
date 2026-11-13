@@ -152,7 +152,10 @@ function goto(page) {
   if (page === 'champs') loadChampions();
   if (page === 'builds') loadBuilds();
   if (page === 'meta') loadMeta();
-  if (page === 'live') renderLive(state, true);
+  if (page === 'live') {
+    renderLive(state, true);
+    if (state) renderCoach(state, true);
+  }
 }
 
 // ---------------------------------------------------------------- rendu
@@ -369,7 +372,19 @@ function renderSettingsExtras(s) {
         return row;
       }),
     );
+    const row = el('label', 'switch-row');
+    const txt = el('span');
+    txt.append(el('b', '', 'Meta Platine et moins multi-régions'), el('small', '', 'Collecte en parallèle sur 2 autres régions (quota Riot à part) : données en quelques minutes, sans ralentir tes builds'));
+    const sw = el('span', 'switch');
+    const input = el('input');
+    input.type = 'checkbox';
+    input.id = 'metaMultiRegion';
+    input.addEventListener('change', () => saveConfig({ metaMultiRegion: input.checked }));
+    sw.append(input, el('i'));
+    row.append(txt, sw);
+    box.append(row);
   }
+  $('#metaMultiRegion').checked = cfg.metaMultiRegion !== false;
   for (const i of $$('[data-mode]')) i.checked = (cfg.collectModes || {})[i.dataset.mode] !== false;
 
   // langue : automatique (client LoL), français, anglais (+ la langue actuelle si autre)
@@ -835,7 +850,7 @@ function renderAppearance(s) {
 
 function renderUpdate(s) {
   const u = s.update;
-  $('#version').textContent = `version ${s.version || ''}`.trim();
+  $('#version').textContent = `version ${s.versionLabel || s.version || ''}`.trim();
 
   // carte de l'accueil
   const cardEl = $('#updateCard');
@@ -895,7 +910,7 @@ function renderUpdate(s) {
 
 // ---------------------------------------------------------------- builds
 
-let bSel = { champKey: 0, role: '' };
+let bSel = { champKey: 0, role: '', family: 'sr' };
 let bData = null;
 
 async function loadBuilds() {
@@ -917,11 +932,19 @@ async function loadBuilds() {
     if (!bSel.champKey && state && state.favorites.length) bSel.champKey = state.favorites[0].key;
   }
   sel.value = bSel.champKey ? String(bSel.champKey) : '';
+  const ms = $('#bMode');
+  if (!ms.childElementCount) {
+    ms.append(
+      ...FAMILY_TABS.map(([v, t]) =>
+        h('button', { 'data-family': v, onclick: () => { bSel.family = v; bOpen = null; bDetail = null; refreshBuilds(); } }, t),
+      ),
+    );
+  }
   const seg = $('#bRole');
   if (!seg.childElementCount) {
     seg.append(
       ...[['', 'Auto'], ...ROLES].map(([v, t]) =>
-        h('button', { 'data-role': v, onclick: () => { bSel.role = v; refreshBuilds(); } }, t),
+        h('button', { 'data-role': v, onclick: () => { bSel.role = v; bOpen = null; bDetail = null; refreshBuilds(); } }, t),
       ),
     );
   }
@@ -930,7 +953,9 @@ async function loadBuilds() {
 
 async function refreshBuilds() {
   for (const b of $$('#bRole button')) b.classList.toggle('active', b.dataset.role === bSel.role);
-  bData = bSel.champKey ? await api.invoke('builds:get', { champKey: bSel.champKey, role: bSel.role }) : null;
+  for (const b of $$('#bMode button')) b.classList.toggle('active', b.dataset.family === bSel.family);
+  $('#bRole').hidden = bSel.family !== 'sr';
+  bData = bSel.champKey ? await api.invoke('builds:get', { champKey: bSel.champKey, role: bSel.role, family: bSel.family }) : null;
   renderBuilds();
 }
 
@@ -941,12 +966,15 @@ function renderBuilds() {
     view.replaceChildren(h('div', { class: 'card lv-empty' }, h('p', { class: 'muted' }, 'Choisis un champion pour voir ses builds.')));
     return;
   }
-  const roleName = ROLE_LABEL[d.role] || '—';
+  const sr = (d.family || 'sr') === 'sr';
+  const famName = (FAMILY_TABS.find(([v]) => v === (d.family || 'sr')) || [0, 'Faille'])[1];
+  const roleName = sr ? ROLE_LABEL[d.role] || '—' : famName;
+  const sampleNoun = sr ? 'parties Chall/GM analysées' : `parties ${famName} analysées${d.dataFamily && d.dataFamily !== d.family ? ' (données ARAM)' : ''}`;
   const head = h(
     'div',
     { class: 'card b-head' },
     ico(d.icon, d.champion),
-    h('div', null, h('h3', null, d.champion, ' ', h('span', { class: 'chip' }, roleName)), h('p', { class: 'muted' }, `${fmt(d.n)} parties Chall/GM analysées${bSel.role ? '' : ' · poste le plus joué'}`)),
+    h('div', null, h('h3', null, d.champion, ' ', h('span', { class: 'chip' }, roleName)), h('p', { class: 'muted' }, `${fmt(d.n)} ${sampleNoun}${sr && !bSel.role ? ' · poste le plus joué' : ''}`)),
   );
   if (!d.variants.length) {
     view.replaceChildren(head, h('div', { class: 'card lv-empty' }, h('p', { class: 'muted' }, 'Pas encore assez de parties pour ce champion à ce poste : ajoute-le à tes favoris pour accélérer la collecte.')));
@@ -957,19 +985,22 @@ function renderBuilds() {
     ...d.variants.map((v) =>
       h(
         'div',
-        { class: `card b-var ${v.favorite ? 'b-fav' : ''}` },
+        { class: `card b-var ${v.favorite ? 'b-fav' : ''} ${bOpen === v.id ? 'open' : ''}` },
         h(
           'div',
           { class: 'lv-t' },
-          h('h3', null, v.label, v.favorite ? h('span', { class: 'tag' }, '★ ton build') : null),
+          h('h3', null, v.label, v.favorite ? h('span', { class: 'tag' }, '★ ton build') : null, (v.players || []).some((p) => p.pro) ? h('span', { class: 'tag pro' }, `joué par ${v.players.find((p) => p.pro).pro.name}`) : null),
           h('span', { class: 'meta' }, [v.share ? `${Math.round(v.share * 100)} % des parties` : null, `${fmt(v.n)} parties`, v.wr ? `${Math.round(v.wr * 100)} % de victoires` : null].filter(Boolean).join(' · ')),
         ),
-        lvPath(v.boots ? [v.boots, ...v.items] : v.items),
+        h('div', { class: 'b-click', role: 'button', tabindex: '0', title: 'Voir le détail du build', onclick: () => toggleBuild(v), onkeydown: (e) => { if (e.key === 'Enter') toggleBuild(v); } }, lvPath(v.boots ? [v.boots, ...v.items] : v.items), h('span', { class: 'b-more' }, bOpen === v.id ? 'Masquer le détail ▴' : 'Voir le détail : joueurs, pourquoi ces objets ▾')),
+        bOpen === v.id ? (bDetail && bDetail.empty ? h('p', { class: 'muted small' }, 'Pas assez de parties pour détailler ce build.') : renderBuildDetail(bDetail)) : null,
         h(
           'div',
           { class: 'b-foot' },
           v.keystone ? h('span', { class: 'b-ks' }, ico(v.keystone.icon, v.keystone.name, 'round'), v.keystone.name) : h('span'),
-          v.favorite
+          !sr
+            ? h('span')
+            : v.favorite
             ? h('button', { class: 'btn ghost small', onclick: async () => { bData = await api.invoke('builds:unfavorite', { champKey: d.champKey, role: d.role }); renderBuilds(); } }, 'Retirer des favoris')
             : h(
                 'button',
@@ -1044,7 +1075,7 @@ async function loadMeta() {
   const tierName = TIERS.find(([v]) => v === mSel.tier)[1];
   if (d.matches < 30) {
     view.replaceChildren(
-      h('div', { class: 'card lv-empty' }, h('h3', null, `${tierName} : pas encore assez de parties`), h('p', { class: 'muted' }, `${fmt(d.matches)} parties pour l'instant. La collecte meta tourne en fond (Réglages › Collecte › Meta) : reviens dans un moment.`)),
+      h('div', { class: 'card lv-empty' }, h('h3', null, `${tierName} : pas encore assez de parties`), h('p', { class: 'muted' }, `${fmt(d.matches)} parties pour l'instant.${mSel.tier === 'low' ? ' Platine et moins est collecté en parallèle sur plusieurs régions : compte quelques minutes avec la collecte lancée.' : ' La collecte meta tourne en fond (Réglages › Collecte › Meta) : reviens dans un moment.'}`)),
     );
     return;
   }
@@ -1079,6 +1110,9 @@ async function loadMeta() {
         );
       }),
     ),
+    ...(mSel.tier === 'low' && state && state.crawler && state.crawler.metaLow && state.crawler.metaLow.platforms.length
+      ? [h('p', { class: 'muted small' }, `Platine et moins : parties de ta région et de ${state.crawler.metaLow.platforms.map((x) => x.replace(/\d+$/, '').toUpperCase()).join(', ')} (quotas Riot séparés, la meta à ce niveau varie peu d’une région à l’autre).`)]
+      : []),
     h('p', { class: 'muted small' }, `${fmt(d.matches)} parties analysées${d.patch ? ` · patch ${d.patch}` : ' · derniers patchs'}. Colonnes : % de pick puis % de victoire.${mSel.sort === 'win' ? ` Champions joués au moins ${minGames} fois.` : ''}`),
   );
 }
@@ -1155,6 +1189,9 @@ function render() {
   renderAppearance(s);
   renderFollowed(s);
   renderLive(s);
+  renderCoach(s);
+  renderDisplay(s);
+  renderChannel(s);
   if (!$('#page-champs').hidden) renderRolePrefs();
   $('#roleKey').textContent = s.hotkeys.role || '—';
 
@@ -1361,6 +1398,7 @@ function bind() {
     render();
   });
   $('#updInstall').addEventListener('click', installUpdate);
+  for (const b of $$('#updChannel button')) b.addEventListener('click', () => saveConfig({ updateChannel: b.dataset.channel }));
   $('#updRepoSave').addEventListener('click', async () => {
     const v = $('#updRepo').value.trim();
     state = await api.invoke('config:set', { updateRepo: v });
@@ -1385,6 +1423,242 @@ function bind() {
     setMsg('#csMsg', r.message, r.ok ? 'ok' : 'warn');
     setTimeout(() => delete m.dataset.sticky, 6000);
   });
+}
+
+
+// ---------------------------------------------------------------- analyse de la partie (En direct)
+
+let lastCoachKey = '';
+let coachOpen = null; // fiche écrite ouverte
+
+const GRADE_LABEL = { good: 'bien', ok: 'moyen', bad: 'à travailler', neutral: '' };
+
+function openUrl(url) {
+  api.invoke('link:url', url);
+}
+
+function renderCoach(s, force = false) {
+  const box = $('#coachView');
+  if (!box || ($('#page-live').hidden && !force)) return;
+  const c = s.coach;
+  const key = JSON.stringify([c, coachOpen]);
+  if (key === lastCoachKey && !force) return;
+  lastCoachKey = key;
+  if (!c) {
+    box.replaceChildren();
+    return;
+  }
+  const title = c.demo ? 'Analyse de la partie (aperçu)' : c.final ? 'Ta dernière partie' : 'Ta partie en cours';
+  const when = c.final && c.endedAt ? ` · ${new Date(c.endedAt).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}` : '';
+  const head = h(
+    'div',
+    { class: 'lv-t' },
+    h('h3', null, title),
+    h('span', { class: 'meta' }, `${c.champion || ''}${c.role ? ` ${ROLE_LABEL[c.role] || ''}` : ''} · ${c.minutes} min${when}`),
+  );
+  const stats = h(
+    'div',
+    { class: 'co-stats' },
+    c.stats.map((st) =>
+      h('div', { class: `co-stat ${st.grade}` }, h('span', { class: 'l' }, st.label), h('b', null, st.value), h('small', null, st.sub), GRADE_LABEL[st.grade] ? h('em', null, GRADE_LABEL[st.grade]) : null),
+    ),
+  );
+  const items = c.items && c.items.length
+    ? h(
+        'div',
+        { class: 'co-items' },
+        h('span', { class: 't' }, 'Objets'),
+        c.items.map((it) => h('span', { class: 'co-item' }, ico(it.icon, it.name), h('span', null, it.name), it.minute !== null && it.minute !== undefined ? h('small', null, `${it.minute} min${it.typical ? ` (repère ${it.typical})` : ''}`) : null)),
+      )
+    : null;
+  const done = h('div', { class: 'co-col good' }, h('h4', null, '✓ Ce que tu as bien fait'), c.done.length ? h('ul', null, c.done.map((t) => h('li', null, t))) : h('p', { class: 'muted small' }, 'Rien de marquant pour l’instant.'));
+  const improve = h(
+    'div',
+    { class: 'co-col todo' },
+    h('h4', null, '↗ Ce qui est améliorable'),
+    c.improve.length
+      ? c.improve.map((x) =>
+          h(
+            'div',
+            { class: 'co-tip' },
+            h('b', null, x.title),
+            h('p', null, x.detail),
+            h(
+              'div',
+              { class: 'co-res' },
+              x.resources.map((r) =>
+                r.kind === 'video'
+                  ? h('button', { class: 'btn ghost small', title: 'Ouvre une recherche YouTube', onclick: () => openUrl(r.url) }, '▶ ', r.label)
+                  : h('button', { class: `btn ghost small ${coachOpen === x.id ? 'active' : ''}`, onclick: () => { coachOpen = coachOpen === x.id ? null : x.id; renderCoach(state, true); } }, '📄 Comment progresser'),
+              ),
+            ),
+            coachOpen === x.id ? h('ol', { class: 'co-how' }, x.how.map((t) => h('li', null, t))) : null,
+          ),
+        )
+      : h('p', { class: 'muted small' }, 'Aucun point faible repéré.'),
+  );
+  box.replaceChildren(
+    h(
+      'div',
+      { class: 'card lv-card coach' },
+      head,
+      stats,
+      items,
+      h('div', { class: 'co-grid' }, done, improve),
+      c.championVideo ? h('div', { class: 'btns' }, h('button', { class: 'btn ghost small', onclick: () => openUrl(c.championVideo.url) }, '▶ ', c.championVideo.label)) : null,
+      h('p', { class: 'muted small' }, 'Repères généraux par poste. Les timings d’objets viennent des parties des meilleurs joueurs collectées par BuildSense.'),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------- mode d'affichage du jeu (overlay)
+
+let lastDisplayKey = '';
+
+function displayCard(d, compact) {
+  if (!d) return null;
+  const fix = async (channel) => {
+    const r = await api.invoke(channel);
+    showToast({ text: r.message, level: r.ok ? 'ok' : 'warn' });
+  };
+  if (d.fsoDisabled) {
+    return h(
+      'div',
+      { class: 'callout warn' },
+      h('b', null, 'Les optimisations plein écran de Windows sont désactivées pour LoL. '),
+      'En plein écran, aucune fenêtre (overlay compris) ne peut alors passer devant le jeu. ',
+      h('button', { class: 'btn small', onclick: () => fix('game:fixFso') }, 'Les réactiver'),
+    );
+  }
+  if (d.windowMode === 'fullscreen') {
+    return h(
+      'div',
+      { class: 'callout' },
+      h('b', null, 'LoL est en Plein écran. '),
+      'L’overlay s’affiche par-dessus grâce aux optimisations plein écran de Windows. S’il n’apparaît pas, passe en Sans bordure : même rendu, et l’alt-tab est instantané. ',
+      h('button', { class: 'btn small ghost', onclick: () => fix('game:setBorderless') }, 'Passer en sans bordure'),
+    );
+  }
+  if (compact) return null;
+  if (d.windowMode === 'borderless') return h('div', { class: 'callout ok' }, h('b', null, 'LoL est en Fenêtré sans bordure : '), 'l’overlay s’affiche toujours par-dessus le jeu.');
+  if (d.windowMode === 'windowed') {
+    return h(
+      'div',
+      { class: 'callout' },
+      h('b', null, 'LoL est en Fenêtré. '),
+      'L’overlay fonctionne, mais le mode Sans bordure est plus confortable (plein écran, alt-tab instantané). ',
+      h('button', { class: 'btn small ghost', onclick: () => fix('game:setBorderless') }, 'Passer en sans bordure'),
+    );
+  }
+  return h('div', { class: 'callout' }, 'L’overlay marche en ', h('b', null, 'Fenêtré sans bordure'), ' et en ', h('b', null, 'Plein écran'), ' (optimisations plein écran de Windows activées).');
+}
+
+function renderDisplay(s) {
+  const key = JSON.stringify(s.display);
+  if (key === lastDisplayKey) return;
+  lastDisplayKey = key;
+  $('#displayBox').replaceChildren(...[displayCard(s.display, false)].filter(Boolean));
+  $('#displayWarn').replaceChildren(...[displayCard(s.display, true)].filter(Boolean));
+}
+
+// ---------------------------------------------------------------- détail d'un build
+
+const FAMILY_TABS = [
+  ['sr', 'Faille'],
+  ['aram', 'ARAM'],
+  ['mayhem', 'ARAM Mayhem'],
+  ['arena', 'Arena'],
+];
+let bOpen = null; // id du build ouvert
+let bDetail = null;
+
+const pct0 = (x) => `${Math.round((x || 0) * 100)} %`;
+
+function playerLine(p) {
+  return h(
+    'div',
+    { class: 'bd-player' },
+    h('div', { class: 'pn' }, h('b', null, p.pro && p.pro.sure ? p.pro.name : p.name), p.tag ? h('small', null, `#${p.tag}`) : null),
+    p.pro ? h('span', { class: `tag pro ${p.pro.sure ? '' : 'maybe'}` }, p.pro.sure ? `PRO · ${p.pro.team}` : `pro probable · ${p.pro.team}`) : null,
+    p.rank ? h('span', { class: 'chip ghost' }, p.rank) : null,
+    h('span', { class: 'meta' }, `${p.games} partie${p.games > 1 ? 's' : ''} · ${pct0(p.wins / (p.games || 1))} victoires`),
+  );
+}
+
+function renderBuildDetail(d) {
+  if (!d) return h('div', { class: 'bd muted small' }, 'Chargement du détail…');
+  const slots = d.slots.map((s, i) =>
+    h(
+      'div',
+      { class: 'bd-slot' },
+      h('div', { class: 'bd-item' }, h('span', { class: 'rk' }, String(i + 1)), ico(s.icon, s.name), h('div', null, h('b', null, s.name), h('small', null, [`${pct0(s.share)} à ce moment`, `${pct0(s.wr)} victoires`, s.minute ? `vers ${s.minute} min` : null].filter(Boolean).join(' · ')))),
+      s.why.length ? h('ul', { class: 'bd-why' }, s.why.map((t) => h('li', null, t))) : null,
+      s.alternatives.length
+        ? h(
+            'div',
+            { class: 'bd-alts' },
+            h('span', { class: 't' }, 'Plutôt que'),
+            s.alternatives.map((a) => h('span', { class: 'bd-alt', title: a.when.join(', ') }, ico(a.icon, a.name), h('span', null, a.name), h('small', null, `${pct0(a.share)} · ${pct0(a.wr)} V${a.when.length ? ` · ${a.when[0]}` : ''}`))),
+          )
+        : null,
+    ),
+  );
+  const side = [];
+  if (d.boots && d.boots.length) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Bottes'), d.boots.map((b) => h('span', { class: 'bd-alt' }, ico(b.icon, b.name), h('span', null, b.name), h('small', null, pct0(b.share))))));
+  if (d.start) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Départ'), d.start.list.map((it) => ico(it.icon, it.name)), h('small', null, pct0(d.start.share))));
+  if (d.spells) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Sorts'), d.spells.list.map((sp) => h('span', { class: 'bd-alt' }, ico(sp.icon, sp.name, 'round'), h('span', null, sp.name))), h('small', null, pct0(d.spells.share))));
+  if (d.runes && d.runes.keystone) {
+    side.push(
+      h(
+        'div',
+        { class: 'bd-row' },
+        h('span', { class: 't' }, 'Runes'),
+        ico(d.runes.keystone.icon, d.runes.keystone.name, 'round'),
+        h('span', null, h('b', null, d.runes.keystone.name), ' · ', d.runes.main.map((r) => r.name).join(', '), d.runes.secondary ? ` + ${d.runes.secondary.name} (${d.runes.sub.map((r) => r.name).join(', ')})` : ''),
+        h('small', null, pct0(d.runes.share)),
+      ),
+    );
+  }
+  if (d.skills) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Compétences'), h('b', null, d.skills.order), h('small', null, `début ${d.skills.first}`)));
+  const players = d.players.length
+    ? h('div', { class: 'bd-players' }, h('h4', null, 'Joueurs qui jouent ce build'), d.players.map(playerLine))
+    : h('p', { class: 'muted small' }, 'Les joueurs de ce build apparaîtront ici au fil de la collecte (Riot ID, rang et pros reconnus).');
+  return h(
+    'div',
+    { class: 'bd' },
+    h('p', { class: 'muted small' }, `${fmt(d.n)} parties · ${pct0(d.wr)} de victoires${d.duration ? ` · parties de ${d.duration} min en moyenne` : ''}`),
+    h('div', { class: 'bd-slots' }, slots),
+    side.length ? h('div', { class: 'bd-side' }, side) : null,
+    players,
+  );
+}
+
+async function toggleBuild(v) {
+  if (bOpen === v.id) {
+    bOpen = null;
+    bDetail = null;
+    renderBuilds();
+    return;
+  }
+  bOpen = v.id;
+  bDetail = null;
+  renderBuilds();
+  const want = v.id;
+  const d = await api.invoke('builds:detail', { champKey: bData.champKey, role: bData.role, family: bSel.family, variantId: v.id });
+  if (bOpen !== want) return;
+  bDetail = d || { empty: true };
+  renderBuilds();
+}
+
+// ---------------------------------------------------------------- canal de mises à jour
+
+function renderChannel(s) {
+  const ch = s.config.updateChannel === 'beta' ? 'beta' : 'stable';
+  for (const b of $$('#updChannel button')) b.classList.toggle('active', b.dataset.channel === ch);
+  $('#updChannelHelp').textContent =
+    ch === 'beta'
+      ? 'Bêta : les nouveautés dès qu’elles sont prêtes (versions « PG-date-bN »). Si la version stable est plus récente, tu la reçois aussi.'
+      : 'Stable : chaque bêta devient stable le lendemain à 9 h, si aucun souci n’a été trouvé entre-temps.';
 }
 
 async function start() {

@@ -17,6 +17,10 @@ const DEFAULTS = {
   detectedLocale: null,
   // modes dont on collecte les builds
   collectModes: { sr: true, aram: true, mayhem: true, arena: true, meta: true },
+  // meta Platine et moins : collecteurs en parallèle sur d'autres régions (quotas Riot séparés)
+  metaMultiRegion: true,
+  // mises à jour : 'stable' (publiée chaque jour à 9 h) ou 'beta' (dès qu'elle est prête)
+  updateChannel: 'stable',
   favorites: [], // championKeys (nombres) à collecter en priorité
   // poste préféré par champion, ex. { "98": "UTILITY" } pour Shen support ('' = automatique)
   rolePrefs: {},

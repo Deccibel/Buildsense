@@ -1,0 +1,36 @@
+# Chaque jour à 9 h (heure de Paris), la dernière bêta publiée la veille ou avant devient la version stable.
+# Le même installeur est republié en vX.Y.Z (marqué latest) : les applis en canal Stable le reçoivent.
+# Pause : ajouter "[hold]" dans la description de la release "beta". Promotion immédiate : lancer à la main avec "force".
+name: Promouvoir la bêta en stable
+
+on:
+  schedule:
+    # 9 h à Paris = 8 h UTC en hiver, 7 h UTC en été (le script vérifie l'heure de Paris)
+    - cron: '0 7 * * *'
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Promouvoir tout de suite la dernière bêta'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Promotion
+        run: node scripts/promote.js ${{ inputs.force && '--force' || '' }}

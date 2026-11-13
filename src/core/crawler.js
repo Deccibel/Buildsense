@@ -19,7 +19,17 @@ const WEIGHTS = { sr: 3, aram: 2, mayhem: 1, arena: 1, meta: 1 };
 const DEFAULT_MODES = { sr: true, aram: true, mayhem: true, arena: true, meta: true };
 // collecte "meta" : paliers d'élo sous Grand Maître (Grand Maître et plus = collecte des builds)
 const META_TIERS = ['low', 'emerald', 'diamond', 'master'];
-const LOW_TIERS = ['PLATINUM', 'PLATINUM', 'GOLD', 'GOLD', 'SILVER', 'BRONZE', 'IRON'];
+// répartition proche de la population classée (la majorité des joueurs est Or / Argent / Platine)
+const LOW_TIERS = ['PLATINUM', 'PLATINUM', 'PLATINUM', 'GOLD', 'GOLD', 'GOLD', 'SILVER', 'SILVER', 'BRONZE', 'IRON'];
+// Platine et moins : le palier compte double dans la collecte meta de ta région
+const META_ROTATION = ['low', 'emerald', 'low', 'diamond', 'low', 'master'];
+/**
+ * Collecte "Platine et moins" multi-régions : chaque région a son propre quota de requêtes chez Riot.
+ * Des collecteurs dédiés tournent en parallèle sur d'autres régions que la tienne, sans ralentir
+ * la collecte des builds. La meta à bas élo est très proche d'une région à l'autre.
+ */
+const EXTRA_META_PLATFORMS = { europe: ['na1', 'kr'], americas: ['euw1', 'kr'], asia: ['euw1', 'na1'], sea: ['euw1', 'na1'] };
+const REGION_OF = { euw1: 'europe', eun1: 'europe', tr1: 'europe', ru: 'europe', me1: 'europe', na1: 'americas', br1: 'americas', la1: 'americas', la2: 'americas', kr: 'asia', jp1: 'asia' };
 const DIVISIONS = ['I', 'II', 'III', 'IV'];
 const ALL_FAMILIES = [...FAMILY_IDS, 'meta'];
 
@@ -43,6 +53,7 @@ class Crawler extends EventEmitter {
     this.pausedForGame = false;
     this.ladder = [];
     this.ladderAt = 0;
+    this.ranks = new Map(); // puuid -> "C1240" (Challenger 1240 LP), pour nommer les joueurs des builds
     this.masteryIdx = 0;
     this.favPlayersFound = 0;
     this.favKey = '';
@@ -51,7 +62,9 @@ class Crawler extends EventEmitter {
     this.matchesAdded = 0;
     this.recordsAdded = 0;
     this.metaIdx = 0;
-    this.metaPools = {}; // palier -> { at, players: [puuid] }
+    this.metaPools = {}; // palier (ou "low@na1") -> { at, players: [puuid] }
+    this.metaWorkers = new Map(); // plateforme -> boucle de collecte Platine et moins
+    this.metaLow = { matches: 0, byPlatform: {} };
     this.followPuuid = new Map(); // id du joueur suivi -> puuid (résolu à chaque session)
     this.lastError = null;
     this.state = 'stopped';
@@ -85,6 +98,7 @@ class Crawler extends EventEmitter {
       priorityQueue: this.fam.sr.priority.length,
       favPlayersFound: this.favPlayersFound,
       families,
+      metaLow: { matches: this.metaLow.matches, platforms: [...this.metaWorkers.keys()], byPlatform: { ...this.metaLow.byPlatform } },
     };
   }
 
@@ -107,10 +121,84 @@ class Crawler extends EventEmitter {
     this.failures = 0;
     this.setState('running');
     this.loop();
+    this.startMetaWorkers();
+  }
+
+  /** Plateformes des collecteurs Platine et moins en parallèle (hors de ta région). */
+  extraMetaPlatforms() {
+    const cfg = this.getConfig();
+    if (cfg.metaMultiRegion === false || !this.enabledModes().meta) return [];
+    const region = REGION_OF[cfg.platform] || 'europe';
+    return EXTRA_META_PLATFORMS[region] || [];
+  }
+
+  startMetaWorkers() {
+    for (const pf of this.extraMetaPlatforms()) {
+      if (this.metaWorkers.has(pf)) continue;
+      const w = { stop: false };
+      this.metaWorkers.set(pf, w);
+      this.metaWorkerLoop(pf, w);
+    }
+  }
+
+  stopMetaWorkers() {
+    for (const w of this.metaWorkers.values()) w.stop = true;
+    this.metaWorkers.clear();
+  }
+
+  async metaWorkerLoop(platform, w) {
+    let failures = 0;
+    while (this.running && !w.stop) {
+      if (this.pausedForGame) {
+        await sleep(3000);
+        continue;
+      }
+      try {
+        await this.metaLowStep(platform);
+        failures = 0;
+      } catch (e) {
+        if (e instanceof ApiKeyError) break;
+        failures++;
+        await sleep(Math.min(120000, 10000 * failures));
+      }
+    }
+    if (this.metaWorkers.get(platform) === w) this.metaWorkers.delete(platform);
+  }
+
+  /** Une étape de collecte Platine et moins sur une plateforme : 1 joueur, ses 2 dernières classées. */
+  async metaLowStep(platform) {
+    const key = `low@${platform}`;
+    let pool = this.metaPools[key];
+    if (!pool || Date.now() - pool.at > LADDER_TTL || !pool.players.length) {
+      const t = LOW_TIERS[Math.floor(Math.random() * LOW_TIERS.length)];
+      const d = DIVISIONS[Math.floor(Math.random() * DIVISIONS.length)];
+      const entries = (await this.api.leagueEntries(t, d, 1 + Math.floor(Math.random() * 5), platform)) || [];
+      pool = this.metaPools[key] = { at: Date.now(), players: shuffle(entries.map((e) => e.puuid).filter(Boolean)).slice(0, 80) };
+      if (!pool.players.length) {
+        await sleep(5000);
+        return;
+      }
+    }
+    const puuid = pool.players.shift();
+    const days = this.getConfig().collectDays || 14;
+    const ids = await this.api.matchIds(puuid, { queue: 420, count: 2, startTime: Math.floor(Date.now() / 1000) - days * 86400, platform });
+    for (const id of ids || []) {
+      if (!this.running || this.pausedForGame) break;
+      if (this.store.hasSeen(id)) continue;
+      const match = await this.api.match(id, platform);
+      this.store.markSeen(id);
+      const recs = extractLite(match, 'low');
+      if (!recs.length) continue;
+      this.store.add(recs);
+      this.metaLow.matches++;
+      this.metaLow.byPlatform[platform] = (this.metaLow.byPlatform[platform] || 0) + 1;
+      this.emitStatus();
+    }
   }
 
   stop() {
     this.running = false;
+    this.stopMetaWorkers();
     this.setState('stopped');
   }
 
@@ -169,16 +257,23 @@ class Crawler extends EventEmitter {
   async ensureLadder() {
     if (this.ladder.length && Date.now() - this.ladderAt < LADDER_TTL) return;
     const entries = [];
+    const ranks = new Map();
     for (const tier of ['challenger', 'grandmaster']) {
       const league = await this.api.league(tier);
-      if (league && Array.isArray(league.entries)) entries.push(...league.entries);
+      if (league && Array.isArray(league.entries)) {
+        entries.push(...league.entries);
+        for (const e of league.entries) if (e.puuid) ranks.set(e.puuid, `${tier === 'challenger' ? 'C' : 'G'}${e.leaguePoints || 0}`);
+      }
     }
     if (entries.length < 100) {
       const master = await this.api.league('master');
       if (master && Array.isArray(master.entries)) {
-        entries.push(...master.entries.sort((a, b) => b.leaguePoints - a.leaguePoints).slice(0, 400));
+        const top = master.entries.sort((a, b) => b.leaguePoints - a.leaguePoints).slice(0, 400);
+        entries.push(...top);
+        for (const e of top) if (e.puuid) ranks.set(e.puuid, `M${e.leaguePoints || 0}`);
       }
     }
+    this.ranks = ranks;
     this.ladder = shuffle(
       entries
         .map((e) => ({ puuid: e.puuid || null, summonerId: e.summonerId || null }))
@@ -291,7 +386,7 @@ class Crawler extends EventEmitter {
 
   /** Collecte meta : quelques parties récentes de joueurs d'un palier, sans timeline (1 requête par partie). */
   async metaStep() {
-    const tier = META_TIERS[this.metaIdx++ % META_TIERS.length];
+    const tier = META_ROTATION[this.metaIdx++ % META_ROTATION.length];
     let pool = this.metaPools[tier];
     if (!pool || Date.now() - pool.at > LADDER_TTL || !pool.players.length) {
       let entries = [];
@@ -308,7 +403,8 @@ class Crawler extends EventEmitter {
     const puuid = pool.players.shift();
     if (!puuid) return;
     const days = this.getConfig().collectDays || 14;
-    const ids = await this.api.matchIds(puuid, { queue: 420, count: 4, startTime: Math.floor(Date.now() / 1000) - days * 86400 });
+    // 2 parties par joueur : plus de joueurs différents, donc un échantillon plus représentatif
+    const ids = await this.api.matchIds(puuid, { queue: 420, count: tier === 'low' ? 2 : 4, startTime: Math.floor(Date.now() / 1000) - days * 86400 });
     for (const id of ids || []) {
       if (!this.running || this.pausedForGame) break;
       if (this.store.hasSeen(id)) continue;
@@ -318,6 +414,11 @@ class Crawler extends EventEmitter {
       if (!recs.length) continue;
       this.store.add(recs);
       this.fam.meta.matchesAdded++;
+      if (tier === 'low') {
+        this.metaLow.matches++;
+        const pf = this.getConfig().platform;
+        this.metaLow.byPlatform[pf] = (this.metaLow.byPlatform[pf] || 0) + 1;
+      }
       this.emitStatus();
     }
   }
@@ -368,7 +469,7 @@ class Crawler extends EventEmitter {
     if (!family || !(match.info.gameDuration >= FAMILIES[family].minDuration)) return;
     // sans timeline (rare), l'ordre d'achat est déduit des objets finaux
     const timeline = await this.api.timeline(id, platform);
-    const recs = extractRecords(match, timeline, this.dd, { follow: this.followMap() });
+    const recs = extractRecords(match, timeline, this.dd, { follow: this.followMap(), ranks: this.ranks });
     if (!recs.length) return;
     this.store.add(recs);
     this.matchesAdded++;

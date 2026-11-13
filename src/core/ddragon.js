@@ -81,6 +81,14 @@ class DDragon {
     return res.json();
   }
 
+  /** Démarrage instantané : dernières données en cache (sans réseau). La vérification du patch se fait ensuite. */
+  loadCached() {
+    const cached = this.readCache(null);
+    if (!cached) return false;
+    this.ingest(cached);
+    return true;
+  }
+
   async load() {
     let version = null;
     try {

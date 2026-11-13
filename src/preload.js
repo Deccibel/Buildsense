@@ -30,6 +30,11 @@ const INVOKE = new Set([
   'whatsnew:dismiss',
   'champions:list',
   'link:open',
+  'link:url',
+  'game:setBorderless',
+  'game:fixFso',
+  'builds:detail',
+  'coach:get',
 ]);
 const ON = new Set(['overlay:update', 'overlay:settings', 'overlay:toast', 'state', 'toast']);
 

@@ -75,12 +75,33 @@ class RiotApi {
     this.getKey = getKey;
     this.getPlatform = getPlatform;
     this.fetch = fetchImpl || globalThis.fetch;
-    this.limiter = new RateLimiter(limits);
+    this.limits = limits;
+    // Les limites de Riot s'appliquent par serveur (euw1, europe, na1, americas...) :
+    // un compteur par serveur permet de collecter sur plusieurs régions en parallèle.
+    this.limiters = new Map();
+    this.limiter = this.limiterFor('default');
     this.requestCount = 0;
   }
 
-  platformHost() {
-    return `https://${this.getPlatform()}.api.riotgames.com`;
+  limiterFor(host) {
+    let l = this.limiters.get(host);
+    if (!l) {
+      l = new RateLimiter(this.limits);
+      this.limiters.set(host, l);
+    }
+    return l;
+  }
+
+  hostOf(url) {
+    try {
+      return new URL(url).host;
+    } catch {
+      return 'default';
+    }
+  }
+
+  platformHost(platform = null) {
+    return `https://${platform || this.getPlatform()}.api.riotgames.com`;
   }
 
   /** platform : serveur d'un joueur suivi (ex. 'kr' pour Faker), sinon celui des réglages. */
@@ -91,8 +112,10 @@ class RiotApi {
   async request(url, { retries = 3 } = {}) {
     const key = (this.getKey() || '').trim();
     if (!key) throw new ApiKeyError(401);
+    const host = this.hostOf(url);
+    const limiter = host === this.hostOf(this.platformHost()) ? this.limiter : this.limiterFor(host);
     for (let attempt = 0; ; attempt++) {
-      await this.limiter.acquire();
+      await limiter.acquire();
       let res;
       try {
         res = await this.fetch(url, { headers: { 'X-Riot-Token': key }, signal: AbortSignal.timeout(20000) });
@@ -105,13 +128,13 @@ class RiotApi {
         throw new Error(`Serveurs Riot injoignables${code ? ` (${code})` : ''}. Vérifie ta connexion.`);
       }
       this.requestCount++;
-      this.adoptLimits(res.headers);
+      this.adoptLimits(res.headers, limiter);
       if (res.status === 200) return res.json();
       if (res.status === 404) return null;
       if (res.status === 401 || res.status === 403) throw new ApiKeyError(res.status);
       if (res.status === 429) {
         const ra = parseInt((res.headers && res.headers.get && res.headers.get('retry-after')) || '10', 10);
-        this.limiter.pause((Number.isFinite(ra) ? ra : 10) * 1000);
+        limiter.pause((Number.isFinite(ra) ? ra : 10) * 1000);
         if (attempt < retries + 3) continue;
       }
       if (res.status >= 500 && attempt < retries) {
@@ -123,7 +146,7 @@ class RiotApi {
   }
 
   /** Les clés personnelles/production ont des limites plus hautes : on suit l'en-tête renvoyé. */
-  adoptLimits(headers) {
+  adoptLimits(headers, limiter = this.limiter) {
     const h = headers && headers.get && headers.get('x-app-rate-limit');
     if (!h) return;
     const limits = h
@@ -132,14 +155,14 @@ class RiotApi {
       .filter(([c, s]) => c > 0 && s > 0)
       // marge de sécurité de 10 %
       .map(([c, s]) => [Math.max(1, Math.floor(c * 0.9)), s]);
-    if (limits.length && JSON.stringify(limits) !== this.limiter.signature) this.limiter.setLimits(limits);
+    if (limits.length && JSON.stringify(limits) !== limiter.signature) limiter.setLimits(limits);
   }
 
   // --- Endpoints utilisés ---
 
   /** tier: 'challenger' | 'grandmaster' | 'master' */
-  league(tier) {
-    return this.request(`${this.platformHost()}/lol/league/v4/${tier}leagues/by-queue/RANKED_SOLO_5x5`);
+  league(tier, platform = null) {
+    return this.request(`${this.platformHost(platform)}/lol/league/v4/${tier}leagues/by-queue/RANKED_SOLO_5x5`);
   }
 
   summonerById(summonerId) {
@@ -160,8 +183,8 @@ class RiotApi {
   }
 
   /** Joueurs d'un palier classé (IRON..DIAMOND, divisions I à IV), 205 par page. */
-  leagueEntries(tier, division, page = 1) {
-    return this.request(`${this.platformHost()}/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`);
+  leagueEntries(tier, division, page = 1, platform = null) {
+    return this.request(`${this.platformHost(platform)}/lol/league/v4/entries/RANKED_SOLO_5x5/${tier}/${division}?page=${page}`);
   }
 
   matchIds(puuid, { count = 20, startTime = null, queue = 420, platform = null } = {}) {

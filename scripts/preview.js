@@ -30,6 +30,22 @@ const CHECK = process.argv.includes('--check');
 protocol.registerSchemesAsPrivileged([{ scheme: 'bsicon', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 app.disableHardwareAcceleration();
 
+// sortie fermée (ex. `| head`) : on s'arrête proprement au lieu d'afficher une fenêtre d'erreur en boucle
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (e) => {
+    if (e && e.code === 'EPIPE') app.exit(0);
+  });
+}
+process.on('uncaughtException', (e) => {
+  if (e && e.code === 'EPIPE') return app.exit(0);
+  try {
+    process.stderr.write(`${e && e.stack ? e.stack : e}\n`);
+  } catch {
+    /* sortie fermée */
+  }
+  app.exit(1);
+});
+
 // ------------------------------------------------------------------ détection des textes coupés
 
 /**

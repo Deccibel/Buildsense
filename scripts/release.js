@@ -1,13 +1,19 @@
 'use strict';
 
 /**
- * Publication d'une nouvelle version (à lancer après `npm run dist:win`) :
- *   npm run release            prépare dist/latest.json et publie la version sur GitHub (si `gh` est connecté)
+ * Publication d'une version (à lancer après `npm run dist:win`, normalement par GitHub Actions) :
+ *   npm run release            prépare dist/latest.json et publie sur GitHub (si `gh` est connecté)
  *   npm run release -- --dry   prépare seulement dist/latest.json
  *
- * L'appli installée lit https://github.com/<dépôt>/releases/latest/download/latest.json,
- * télécharge l'installeur indiqué, vérifie sa taille et son empreinte, puis l'installe sur ton clic.
- * Les nouveautés affichées dans l'appli viennent de la section "## <version>" de CHANGELOG.md.
+ * Deux canaux :
+ *  - bêta   (package.json "buildsense.channel": "beta") : publiée tout de suite.
+ *           Release "PG-AAAAMMJJ-bN" (pré-version) + mise à jour de la release fixe "beta"
+ *           (latest.json + BuildSense-Setup-beta.exe), que lisent les applis réglées sur Bêta.
+ *  - stable : release "vX.Y.Z" marquée "latest". Normalement créée chaque jour à 9 h par
+ *           scripts/promote.js à partir de la dernière bêta (même installeur).
+ *
+ * L'appli installée lit latest.json, télécharge l'installeur indiqué, vérifie sa taille et son
+ * empreinte, puis l'installe sur ton clic. Les nouveautés viennent de la section "## <version>" de CHANGELOG.md.
  */
 
 const fs = require('fs');
@@ -18,7 +24,9 @@ const { execFileSync, spawnSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const version = pkg.version;
-const repo = (pkg.buildsense && pkg.buildsense.repo) || '';
+const bs = pkg.buildsense || {};
+const repo = bs.repo || '';
+const beta = bs.channel === 'beta';
 const DRY = process.argv.includes('--dry');
 
 function fail(msg) {
@@ -47,6 +55,8 @@ function notesFor(v) {
 }
 
 if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) fail('Renseigne le dépôt GitHub dans package.json : "buildsense": { "repo": "pseudo/buildsense" }');
+if (beta && !/^PG-\d{8}-b\d+$/.test(bs.betaName || '')) fail('Bêta : "buildsense.betaName" doit ressembler à PG-20261113-b1 (lance "npm run beta").');
+const tag = beta ? bs.betaName : `v${version}`;
 const exeName = `BuildSense-Setup-${version}.exe`;
 const exe = path.join(ROOT, 'dist', exeName);
 if (!fs.existsSync(exe)) fail(`${exeName} introuvable : lance d'abord "npm run dist:win".`);
@@ -56,35 +66,55 @@ const notes = notesFor(version);
 if (!notes.length) console.warn(`! Aucune nouveauté pour ${version} dans CHANGELOG.md (section "## ${version}").`);
 const manifest = {
   version,
+  channel: beta ? 'beta' : 'stable',
+  name: beta ? bs.betaName : version,
   date: new Date().toISOString().slice(0, 10),
+  publishedAt: new Date().toISOString(),
   notes,
   installer: {
-    url: `https://github.com/${repo}/releases/download/v${version}/${exeName}`,
+    url: `https://github.com/${repo}/releases/download/${tag}/${exeName}`,
     sha256: crypto.createHash('sha256').update(buf).digest('hex'),
     size: buf.length,
   },
 };
 const manifestFile = path.join(ROOT, 'dist', 'latest.json');
 fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`✓ dist/latest.json prêt (version ${version}, ${(buf.length / 1048576).toFixed(1)} Mo)`);
+console.log(`✓ dist/latest.json prêt (${manifest.name}, ${(buf.length / 1048576).toFixed(1)} Mo)`);
 
 const ghOk = !DRY && spawnSync('gh', ['auth', 'status'], { stdio: 'ignore' }).status === 0;
 if (!ghOk) {
-  console.log(`
-Publication manuelle sur GitHub :
-  1. Ouvre https://github.com/${repo}/releases/new
-  2. Tag : v${version}   ·   Titre : BuildSense ${version}
-  3. Glisse ces 2 fichiers dans la zone "Attach binaries" :
-       dist/${exeName}
-       dist/latest.json
-  4. Clique sur "Publish release" (laisse "Set as the latest release" coché).
-Les appli BuildSense installées verront la mise à jour à leur prochaine vérification (au lancement, puis toutes les 4 h).
-`);
+  console.log(`\nPublication non faite (--dry ou gh non connecté). Tag prévu : ${tag}${beta ? ' (pré-version) + release "beta"' : ''}.`);
   process.exit(0);
 }
 
-const body = notes.length ? notes.map((n) => `- ${n}`).join('\n') : `BuildSense ${version}`;
-execFileSync('gh', ['release', 'create', `v${version}`, exe, manifestFile, '--repo', repo, '--title', `BuildSense ${version}`, '--notes', body, '--latest'], {
-  stdio: 'inherit',
-});
-console.log(`✓ Version ${version} publiée : https://github.com/${repo}/releases/tag/v${version}`);
+const gh = (args) => execFileSync('gh', [...args, '--repo', repo], { stdio: 'inherit' });
+const ghOut = (args) => spawnSync('gh', [...args, '--repo', repo], { encoding: 'utf8' });
+const body = notes.length ? notes.map((n) => `- ${n}`).join('\n') : `BuildSense ${manifest.name}`;
+
+if (!beta) {
+  gh(['release', 'create', tag, exe, manifestFile, '--title', `BuildSense ${version}`, '--notes', body, '--latest']);
+  console.log(`✓ Version stable ${version} publiée : https://github.com/${repo}/releases/tag/${tag}`);
+  process.exit(0);
+}
+
+// 1. la bêta elle-même (pré-version : jamais "latest", les applis en Stable ne la voient pas)
+gh(['release', 'create', tag, exe, manifestFile, '--title', `BuildSense ${tag} (bêta ${version})`, '--notes', `${body}\n\nBêta : deviendra la version stable ${version} le lendemain à 9 h (heure de Paris).`, '--prerelease', '--latest=false']);
+
+// 2. la release fixe "beta" : toujours la dernière bêta (adresse stable pour l'appli et pour le README)
+const betaBody = [
+  `**Dernière bêta : ${tag}** (version ${version}, publiée le ${manifest.date}).`,
+  '',
+  body,
+  '',
+  `Installer : télécharge **BuildSense-Setup-beta.exe** ci-dessous. Dans l'appli : Réglages › Mises à jour › **Bêta**.`,
+  'Version stable : https://github.com/' + repo + '/releases/latest',
+].join('\n');
+if (ghOut(['release', 'view', 'beta']).status !== 0) {
+  gh(['release', 'create', 'beta', '--title', 'BuildSense bêta (dernière)', '--notes', betaBody, '--prerelease', '--latest=false']);
+} else {
+  gh(['release', 'edit', 'beta', '--title', 'BuildSense bêta (dernière)', '--notes', betaBody, '--prerelease', '--latest=false']);
+}
+const betaExe = path.join(ROOT, 'dist', 'BuildSense-Setup-beta.exe');
+fs.copyFileSync(exe, betaExe);
+gh(['release', 'upload', 'beta', manifestFile, betaExe, '--clobber']);
+console.log(`✓ Bêta ${tag} publiée : https://github.com/${repo}/releases/tag/${tag}`);

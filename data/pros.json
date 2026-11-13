@@ -1,0 +1,4 @@
+{
+  "_doc": "Joueurs pros reconnus dans l onglet Builds. Cle : Riot ID (pseudo#tag), valeur : { name, team, role }. Mise a jour sans nouvelle version de l appli.",
+  "players": {}
+}
