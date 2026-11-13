@@ -145,3 +145,13 @@ test('Mises à jour : canal bêta = la plus récente entre bêta et stable', asy
   delete feeds[BETA];
   assert.equal((await u.check()).latest, '1.7.1', 'pas encore de bêta : la stable suffit');
 });
+
+test('Raccourcis en jeu : combinaisons lues par keywatch', () => {
+  const { comboOf } = require('../src/core/keywatch');
+  assert.deepEqual(comboOf('CommandOrControl+Shift+H'), { ctrl: true, shift: true, alt: false, win: false, vk: 72 });
+  assert.equal(comboOf('Alt+F12').vk, 123);
+  assert.equal(comboOf('Super+num0').vk, 96);
+  assert.equal(comboOf('Shift+PageDown').vk, 34);
+  assert.equal(comboOf(''), null);
+  assert.equal(comboOf('Shift+?'), null);
+});

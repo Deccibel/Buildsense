@@ -2,6 +2,10 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 1.7.1
+
+- Raccourcis clavier actifs pendant la partie, même quand le jeu a le focus (mode compact, afficher/masquer, poste…) : plus besoin de revenir sur BuildSense.
+
 ## 1.7.0
 
 - Démarrage instantané : la fenêtre s'ouvre tout de suite, les données se chargent en fond et Data Dragon part du cache (plus d'attente réseau).

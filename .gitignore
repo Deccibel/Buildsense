@@ -1,3 +1,4 @@
 node_modules/
 preview/
 dist/
+native/bin/

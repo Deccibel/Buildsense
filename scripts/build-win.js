@@ -40,9 +40,20 @@ function findMakensis() {
 
 fs.mkdirSync(DIST, { recursive: true });
 
+// 0. keywatch.exe : raccourcis actifs quand le jeu a le focus (compilé avec le C# fourni avec Windows)
+const keywatch = path.join(ROOT, 'native', 'bin', 'keywatch.exe');
+if (isWin) {
+  const csc = ['Framework64', 'Framework']
+    .map((f) => path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', f, 'v4.0.30319', 'csc.exe'))
+    .find((p) => fs.existsSync(p));
+  if (!csc) throw new Error('csc.exe introuvable : impossible de compiler native/keywatch.cs');
+  fs.mkdirSync(path.dirname(keywatch), { recursive: true });
+  execFileSync(csc, ['/nologo', '/optimize', '/target:exe', `/out:${keywatch}`, path.join(ROOT, 'native', 'keywatch.cs')], { stdio: 'inherit' });
+}
+
 // 1. Appli Windows (BuildSense.exe + fichiers d'Electron)
 // L'appli n'a aucune dépendance à l'exécution : node_modules ne contient que les outils de dev.
-const ignore = '^/(node_modules|test|scripts|build|dist|preview|data|README\\.md|CHANGELOG\\.md|Lancer BuildSense\\.bat|\\.git\\w*|\\.github|package-lock\\.json)($|/)';
+const ignore = '^/(node_modules|test|scripts|build|dist|preview|data|native|README\\.md|CHANGELOG\\.md|Lancer BuildSense\\.bat|\\.git\\w*|\\.github|package-lock\\.json)($|/)';
 // lancé directement avec node (pas de shell : sous Windows, cmd.exe casserait l'expression --ignore)
 run(process.execPath, [
   path.join(ROOT, 'node_modules', '@electron', 'packager', 'bin', 'electron-packager.mjs'),
@@ -52,6 +63,7 @@ run(process.execPath, [
   '--arch=x64',
   `--out=${DIST}`,
   '--icon=assets/icon.ico',
+  ...(fs.existsSync(keywatch) ? [`--extra-resource=${keywatch}`] : []),
   '--asar',
   '--overwrite',
   `--ignore=${ignore}`,

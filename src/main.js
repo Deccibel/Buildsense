@@ -23,6 +23,7 @@ const { Pros } = require('./core/pros');
 const { spawn } = require('child_process');
 const gameWindow = require('./core/gameWindow');
 const { GameCoach } = require('./core/coach');
+const { KeyWatch } = require('./core/keywatch');
 
 const OVERLAY_WIDTH = 340;
 const ROOT = path.join(__dirname, '..');
@@ -150,6 +151,7 @@ async function init() {
   createMainWindow();
   createOverlay();
   createTray();
+  setupKeyWatch();
   registerHotkeys();
   registerIpc();
 
@@ -1210,31 +1212,62 @@ function setHotkey(name, accel) {
   return null;
 }
 
+const HOTKEY_ACTIONS = {
+  toggle: () => toggleHidden(),
+  move: () => setMoveMode(!S.moveMode),
+  compact: () => {
+    S.config.set({ overlay: { compact: !S.config.get('overlay').compact } });
+    pushOverlaySettings();
+    pushState();
+  },
+  importRunes: () => importRunes(),
+  role: () => cycleRole(),
+};
+const HOTKEY_LABELS = {
+  toggle: "Afficher/masquer l'overlay",
+  move: "Déplacer l'overlay",
+  compact: 'Mode compact',
+  importRunes: 'Importer les runes',
+  role: 'Changer de poste',
+};
+
+/**
+ * Un raccourci peut arriver deux fois (raccourci Windows + lecture du clavier par keywatch) :
+ * on n'exécute l'action qu'une fois par appui.
+ */
+function fireHotkey(name) {
+  const fn = HOTKEY_ACTIONS[name];
+  if (!fn || S.hotkeysSuspended) return;
+  const now = Date.now();
+  S.lastHotkey = S.lastHotkey || {};
+  if (now - (S.lastHotkey[name] || 0) < 350) return;
+  S.lastHotkey[name] = now;
+  fn();
+}
+
+/** Raccourcis actifs même quand le jeu a le focus (il bloque ceux de Windows). */
+function setupKeyWatch() {
+  const exe = app.isPackaged ? path.join(process.resourcesPath, 'keywatch.exe') : path.join(ROOT, 'native', 'bin', 'keywatch.exe');
+  S.keyWatch = new KeyWatch({ exe, onKey: fireHotkey });
+  if (S.keyWatch.start()) S.keyWatch.setHotkeys(S.config.get('hotkeys'));
+  app.on('will-quit', () => S.keyWatch.stop());
+}
+
 function registerHotkeys() {
   globalShortcut.unregisterAll();
+  S.hotkeysSuspended = false;
   S.hotkeyErrors = [];
   const hk = S.config.get('hotkeys');
-  const bind = (accel, fn, label) => {
-    if (!accel) return;
+  for (const name of HOTKEY_NAMES) {
+    const accel = hk[name];
+    if (!accel) continue;
     try {
-      if (!globalShortcut.register(accel, fn)) S.hotkeyErrors.push(`${label} (${hotkeyLabel(accel)}) est déjà pris par une autre appli`);
+      if (!globalShortcut.register(accel, () => fireHotkey(name))) S.hotkeyErrors.push(`${HOTKEY_LABELS[name]} (${hotkeyLabel(accel)}) est déjà pris par une autre appli`);
     } catch {
-      S.hotkeyErrors.push(`${label} : raccourci "${accel}" invalide`);
+      S.hotkeyErrors.push(`${HOTKEY_LABELS[name]} : raccourci "${accel}" invalide`);
     }
-  };
-  bind(hk.toggle, toggleHidden, "Afficher/masquer l'overlay");
-  bind(hk.move, () => setMoveMode(!S.moveMode), "Déplacer l'overlay");
-  bind(
-    hk.compact,
-    () => {
-      S.config.set({ overlay: { compact: !S.config.get('overlay').compact } });
-      pushOverlaySettings();
-      pushState();
-    },
-    'Mode compact',
-  );
-  bind(hk.importRunes, importRunes, 'Importer les runes');
-  bind(hk.role, cycleRole, 'Changer de poste');
+  }
+  if (S.keyWatch) S.keyWatch.setHotkeys(hk);
 }
 
 // ---------------------------------------------------------------- état pour la fenêtre principale
@@ -1462,8 +1495,11 @@ function registerIpc() {
   });
   // pendant l'enregistrement d'une combinaison, les raccourcis actuels ne doivent pas se déclencher
   ipcMain.handle('hotkeys:suspend', (_e, on) => {
-    if (on) globalShortcut.unregisterAll();
-    else registerHotkeys();
+    if (on) {
+      globalShortcut.unregisterAll();
+      S.hotkeysSuspended = true;
+      if (S.keyWatch) S.keyWatch.setHotkeys({});
+    } else registerHotkeys();
     return true;
   });
 
