@@ -319,6 +319,7 @@ function champSelectVM({ dd, cs, rec, opponent, latestPatch, hasKey, importHotke
     const ids = rec.spells[0].ids.slice().sort((a, b) => (a === 4 ? -1 : b === 4 ? 1 : 0));
     spells = {
       share: pctInt(rec.spells[0].share),
+      ids,
       list: ids.map((k) => {
         const s = dd.spell(k);
         return s ? { name: s.name, icon: dd.spellIcon(s) } : { name: `Sort ${k}`, icon: null };

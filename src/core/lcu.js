@@ -207,6 +207,17 @@ class LcuClient {
     return res.ok && res.data && res.data.id ? res.data : null;
   }
 
+  /** Sorts d'invocateur conseillés, pendant la sélection (Flash garde sa touche). */
+  async applySpells(ids) {
+    const s = await this.session();
+    if (!s || !Array.isArray(s.myTeam)) return { ok: false, message: 'Sélection des champions introuvable.' };
+    const me = s.myTeam.find((p) => p.cellId === s.localPlayerCellId);
+    const slots = spellSlots(ids, me ? [me.spell1Id, me.spell2Id] : null);
+    if (!slots) return { ok: true, unchanged: true };
+    const r = await this.request('PATCH', '/lol-champ-select/v1/session/my-selection', { spell1Id: slots[0], spell2Id: slots[1] });
+    return r.ok ? { ok: true } : { ok: false, message: `Sorts refusés par le client (${r.status}).` };
+  }
+
   /**
    * Applique une page de runes en REMPLAÇANT la page active (si elle est modifiable),
    * sinon une page Stonks existante, sinon une nouvelle page.
@@ -251,6 +262,24 @@ class LcuClient {
 }
 
 /**
+ * Sorts conseillés placés dans tes deux cases : un sort que tu as déjà garde sa touche
+ * (Flash reste sur D ou sur F, comme tu l'as réglé), les autres prennent les cases restantes.
+ * @returns {[number, number] | null} [spell1Id (D), spell2Id (F)], ou null si rien à changer
+ */
+function spellSlots(recommended, current) {
+  const rec = (recommended || []).filter((x) => Number(x) > 0).slice(0, 2).map(Number);
+  if (rec.length < 2 || rec[0] === rec[1]) return null;
+  const cur = [Number(current && current[0]) || 0, Number(current && current[1]) || 0];
+  const out = [0, 0];
+  for (const id of rec) {
+    const i = cur.indexOf(id);
+    if (i >= 0 && !out[i]) out[i] = id;
+  }
+  for (const id of rec) if (!out.includes(id)) out[out[0] ? 1 : 0] = id;
+  return out[0] === cur[0] && out[1] === cur[1] ? null : out;
+}
+
+/**
  * Extrait de la session de sélection ce qui nous intéresse.
  * `queue` (facultatif) : file d'attente renvoyée par LcuClient.queue(), pour connaître le mode.
  */
@@ -280,4 +309,4 @@ function parseChampSelect(session, dd, queue = null) {
   };
 }
 
-module.exports = { LcuClient, parseChampSelect, pageName, PAGE_PREFIX };
+module.exports = { spellSlots, LcuClient, parseChampSelect, pageName, PAGE_PREFIX };

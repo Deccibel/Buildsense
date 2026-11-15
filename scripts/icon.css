@@ -24,7 +24,7 @@ body {
 /* ombre courte : elle doit tenir dans le carré de l'icône (pas de bord coupé) */
 #stage .mascot .m-body {
   box-shadow:
-    0 calc(var(--ms) * 0.04) calc(var(--ms) * 0.08) calc(var(--ms) * -0.03) rgba(52, 36, 150, 0.55),
+    0 calc(var(--ms) * 0.04) calc(var(--ms) * 0.08) calc(var(--ms) * -0.03) color-mix(in srgb, var(--m3) 60%, #2a0a20),
     0 calc(var(--ms) * 0.012) calc(var(--ms) * 0.03) rgba(4, 8, 30, 0.3);
 }
 

@@ -324,7 +324,8 @@ async function selfTest() {
 }
 
 const APPEARANCES = [
-  ['light', 'stonks'],
+  ['light', 'orange'],
+  ['dark', 'stonks'],
   ['light', 'cyan'],
   ['dark', 'classic'],
   ['light', 'classic'],

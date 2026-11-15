@@ -9,6 +9,8 @@
   const size = Number(q.get('size')) || 512;
   const ratio = Number(q.get('ratio')) || 0.86;
   const stage = document.getElementById('stage');
+  // couleur de l'icône : l'accent principal de l'appli (orange)
+  document.documentElement.dataset.accent = q.get('accent') || 'orange';
   const make = (px, mood) => {
     const m = window.StonksMascot.create({ size: px, idle: false, track: false, sleepAfter: 0 });
     m.setAlive(false);

@@ -2,6 +2,11 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 2.0.3
+
+- L'orange devient la couleur principale de Stonks : appli, overlay, mascotte et icône. L'ancien dégradé reste disponible (« Aurore ») dans Réglages › Apparence.
+- Sélection des champions : en plus des runes, les sorts d'invocateur conseillés sont mis automatiquement. Flash garde sa touche (D ou F) ; si tu changes tes sorts ensuite, Stonks n'y touche plus. Désactivable dans Réglages.
+
 ## 2.0.2
 
 - Nouvelle page Progression : ton objectif de session, tes tendances et tes dernières parties ont leur propre onglet.

@@ -1,7 +1,7 @@
 {
   "name": "stonks",
   "productName": "Stonks",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Coach et overlay de builds pour League of Legends, basé sur les parties des meilleurs joueurs (API officielles Riot uniquement).",
   "author": "Stonks",
   "main": "src/main.js",
@@ -23,7 +23,7 @@
   "stonks": {
     "repo": "Deccibel/buildsense",
     "channel": "beta",
-    "betaName": "PG-20261115-b4",
+    "betaName": "PG-20261115-b5",
     "promote": false
   }
 }

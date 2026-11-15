@@ -440,6 +440,7 @@ function renderSettingsExtras(s) {
   }
   if (document.activeElement !== sel) sel.value = cfg.language || 'auto';
   $('#autoRunes').checked = cfg.autoRunes !== false;
+  $('#autoSpells').checked = cfg.autoSpells !== false;
   $('#autoItemSet').checked = cfg.autoItemSet !== false;
   $('#autoLivePage').checked = cfg.autoLivePage !== false;
 }
@@ -956,19 +957,19 @@ async function installUpdate() {
 }
 
 const ACCENT_LIST = [
-  ['stonks', 'Stonks', 'linear-gradient(135deg, #6ef3c5, #3f9bff 52%, #8a5bff)'],
+  ['orange', 'Orange', 'linear-gradient(135deg, #ffd166, #ff9a3c 50%, #ff5e62)'],
+  ['stonks', 'Aurore', 'linear-gradient(135deg, #6ef3c5, #3f9bff 52%, #8a5bff)'],
   ['cyan', 'Cyan', 'linear-gradient(135deg, #8ff7e4, #2ee6c5 50%, #22b8e6)'],
   ['red', 'Rouge', 'linear-gradient(135deg, #ff9a6b, #ff4d5e 50%, #d83a8c)'],
   ['green', 'Vert', 'linear-gradient(135deg, #c2f58a, #3ddc84 50%, #17b8a0)'],
   ['yellow', 'Jaune', 'linear-gradient(135deg, #fff08a, #f5d142 50%, #ff9f43)'],
-  ['orange', 'Orange', 'linear-gradient(135deg, #ffd166, #ff9a3c 50%, #ff5e62)'],
   ['purple', 'Mauve', 'linear-gradient(135deg, #e0a3ff, #b48cff 50%, #7c5cff)'],
   ['blue', 'Bleu', 'linear-gradient(135deg, #7fd0ff, #4d9fff 50%, #4a6bff)'],
   ['classic', 'Classique LoL', 'linear-gradient(135deg, #c8aa6e 0 50%, #0a1428 50% 100%)'],
 ];
 
 function renderAppearance(s) {
-  const a = s.config.appearance || { theme: 'dark', accent: 'stonks' };
+  const a = s.config.appearance || { theme: 'dark', accent: 'orange' };
   document.documentElement.dataset.accent = a.accent;
   for (const b of $$('#themeSeg button')) b.classList.toggle('active', b.dataset.theme === a.theme);
   const box = $('#accentPick');
@@ -1551,6 +1552,7 @@ function bind() {
     showToast({ text: ok ? 'Dépôt des mises à jour enregistré.' : 'Format attendu : pseudo/nom-du-depot', level: ok ? 'ok' : 'warn' });
   });
   $('#autoRunes').addEventListener('change', (e) => saveConfig({ autoRunes: e.target.checked }));
+  $('#autoSpells').addEventListener('change', (e) => saveConfig({ autoSpells: e.target.checked }));
   $('#autoItemSet').addEventListener('change', (e) => saveConfig({ autoItemSet: e.target.checked }));
   $('#autoLivePage').addEventListener('change', (e) => saveConfig({ autoLivePage: e.target.checked }));
   $('#prefAdd').addEventListener('click', async () => {

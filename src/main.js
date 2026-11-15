@@ -666,7 +666,7 @@ function pushOverlaySettings() {
 }
 
 const THEMES = { auto: 'system', light: 'light', dark: 'dark' };
-const ACCENTS = ['stonks', 'cyan', 'red', 'green', 'yellow', 'orange', 'purple', 'blue', 'classic'];
+const ACCENTS = ['orange', 'stonks', 'cyan', 'red', 'green', 'yellow', 'purple', 'blue', 'classic'];
 
 /** Thème : Electron applique clair/sombre à toutes les fenêtres (prefers-color-scheme). */
 function applyAppearance() {
@@ -872,7 +872,7 @@ function decorateChampSelect(vm) {
   const hk = S.config.get('hotkeys');
   if (vm.roleInfo && vm.roleInfo.roles && hk.role) vm.roleHint = { key: hotkeyLabel(hk.role), text: 'changer de poste' };
   if (vm.page && S.config.get('autoRunes')) {
-    vm.runes = S.autoRunes.status || { state: 'waiting', text: 'Runes appliquées automatiquement dès que tu verrouilles ton champion' };
+    vm.runes = S.autoRunes.status || { state: 'waiting', text: `${S.config.get('autoSpells') && vm.spells ? 'Runes et sorts appliqués' : 'Runes appliquées'} automatiquement dès que tu verrouilles ton champion` };
   }
   return vm;
 }
@@ -891,7 +891,7 @@ function recomputeViews() {
 
 function importOf(vm) {
   if (!vm || !vm.page) return null;
-  return { page: vm.page.importable, champion: vm.header.champion, role: vm.header.role || '', name: `${vm.header.champion} ${vm.header.role || ''}`.trim() };
+  return { page: vm.page.importable, spells: vm.spells && vm.spells.ids ? vm.spells.ids : null, champion: vm.header.champion, role: vm.header.role || '', name: `${vm.header.champion} ${vm.header.role || ''}`.trim() };
 }
 
 /** Vue de la partie pour la page "En direct" de la fenêtre principale (null si rien en cours). */
@@ -977,7 +977,10 @@ async function autoApplyRunes(cs, vm) {
     A.key = key;
     if (r.ok) {
       A.applied = { who, perks };
-      A.status = { state: 'applied', text: `Runes appliquées : ${imp.name}${r.replaced ? ' (page active remplacée)' : ''}` };
+      // sorts : une fois par champion et poste (si tu les changes ensuite, Stonks n'y touche plus)
+      const sp = A.spellsWho !== who ? await applySpells(imp) : null;
+      if (sp !== null) A.spellsWho = who;
+      A.status = { state: 'applied', text: `${sp ? 'Runes et sorts appliqués' : 'Runes appliquées'} : ${imp.name}${r.replaced ? ' (page active remplacée)' : ''}` };
       toast(A.status.text, 'ok');
     } else {
       A.status = { state: 'error', text: r.message };
@@ -986,6 +989,14 @@ async function autoApplyRunes(cs, vm) {
   } finally {
     A.busy = false;
   }
+}
+
+/** Sorts d'invocateur conseillés (réglage « Sorts automatiques ») : true si appliqués, false sinon, null si désactivé. */
+async function applySpells(imp) {
+  if (!S.config.get('autoSpells') || !imp || !imp.spells) return null;
+  const r = await S.lcu.applySpells(imp.spells);
+  if (!r.ok) toast(r.message, 'warn');
+  return r.ok;
 }
 
 /** Page d'objets de la boutique : meilleur départ en tête, puis les autres départs, le build et les bottes. */
@@ -1354,7 +1365,7 @@ function setDemo(kind, { keepOverride = false } = {}) {
     const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'demo', demo.file), 'utf8'));
     if (demo.queue) {
       S.demoVm = decorateChampSelect(computeCs(parseChampSelect(raw, S.dd, demo.queue)));
-      if (S.demoVm && S.demoVm.runes) S.demoVm.runes = { state: 'waiting', text: 'Démo : en vraie sélection, les runes sont appliquées automatiquement' };
+      if (S.demoVm && S.demoVm.runes) S.demoVm.runes = { state: 'waiting', text: 'Démo : en vraie sélection, les runes et les sorts sont appliqués automatiquement' };
     } else {
       const game = normalizeLive(raw, S.dd);
       S.demoVm = game ? computeLive(game, null) : messageVM('Démo', 'Partie de démo illisible.');
@@ -1374,7 +1385,7 @@ function setDemo(kind, { keepOverride = false } = {}) {
 
 async function importRunes() {
   if (S.demo === 'champselect') {
-    const r = { ok: true, message: 'Démo : import simulé, ta page de runes n’a pas été modifiée.' };
+    const r = { ok: true, message: 'Démo : import simulé, tes runes et tes sorts n’ont pas été modifiés.' };
     toast(r.message, 'info');
     return r;
   }
@@ -1385,6 +1396,7 @@ async function importRunes() {
   }
   const imp = S.champSelect.import;
   const r = await S.lcu.importRunes(imp.page, imp.champion, imp.role);
+  const sp = r.ok ? await applySpells(imp) : null;
   if (r.ok) {
     // l'import manuel compte comme une application : la détection de retouche part de cette page
     const vm = S.champSelect.vm;
@@ -1392,10 +1404,11 @@ async function importRunes() {
     const perks = imp.page.selectedPerkIds.join(',');
     S.autoRunes.applied = { who, perks };
     S.autoRunes.key = `${who}|${perks}`;
-    S.autoRunes.status = { state: 'applied', text: `Runes appliquées : ${imp.name}${r.replaced ? ' (page active remplacée)' : ''}` };
+    if (sp !== null) S.autoRunes.spellsWho = who;
+    S.autoRunes.status = { state: 'applied', text: `${sp ? 'Runes et sorts appliqués' : 'Runes appliquées'} : ${imp.name}${r.replaced ? ' (page active remplacée)' : ''}` };
     recomputeViews();
   }
-  toast(r.ok ? `Runes appliquées : ${imp.name}` : r.message, r.ok ? 'ok' : 'warn');
+  toast(r.ok ? `${sp ? 'Runes et sorts appliqués' : 'Runes appliquées'} : ${imp.name}` : r.message, r.ok ? 'ok' : 'warn');
   return r;
 }
 
@@ -1585,7 +1598,7 @@ function sanitizeConfig(patch) {
   if (typeof patch.apiKey === 'string') out.apiKey = patch.apiKey.trim();
   if (PLATFORMS.includes(patch.platform)) out.platform = patch.platform;
   if (Array.isArray(patch.favorites)) out.favorites = [...new Set(patch.favorites.map(Number).filter((n) => n > 0))].slice(0, 20);
-  for (const k of ['crawlerEnabled', 'pauseCrawlerInGame', 'lcuEnabled', 'autoRunes', 'autoItemSet', 'autoLivePage', 'autoUpdate', 'metaMultiRegion']) if (typeof patch[k] === 'boolean') out[k] = patch[k];
+  for (const k of ['crawlerEnabled', 'pauseCrawlerInGame', 'lcuEnabled', 'autoRunes', 'autoSpells', 'autoItemSet', 'autoLivePage', 'autoUpdate', 'metaMultiRegion']) if (typeof patch[k] === 'boolean') out[k] = patch[k];
   if (patch.updateChannel === 'stable' || patch.updateChannel === 'beta') out.updateChannel = patch.updateChannel;
   if (patch.rolePrefs && typeof patch.rolePrefs === 'object') {
     // '' = automatique (la fusion des réglages ne supprime pas les clés)
