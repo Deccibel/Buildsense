@@ -67,10 +67,12 @@
     --shadow: 0 20px 40px -28px rgba(40, 50, 110, 0.4);
     --shadow-float: 0 24px 60px -20px rgba(40, 50, 110, 0.4);
     --grad-text: linear-gradient(100deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--a3)));
-    --w1: 30%;
-    --w2: 24%;
-    --w3: 18%;
-    --w4: 22%;
+    /* clair : dégradé plus soutenu, sinon il disparaît sur le fond blanc */
+    --grad-soft: linear-gradient(135deg, color-mix(in srgb, var(--a1) 30%, transparent), color-mix(in srgb, var(--a3) 24%, transparent));
+    --w1: 55%;
+    --w2: 46%;
+    --w3: 34%;
+    --w4: 42%;
   }
 }
 
@@ -98,10 +100,10 @@
     --dim: #8a8370;
     --fg-rgb: 30, 35, 40;
     --line-2: rgba(143, 106, 31, 0.3);
-    --w1: 26%;
-    --w2: 18%;
-    --w3: 10%;
-    --w4: 22%;
+    --w1: 38%;
+    --w2: 28%;
+    --w3: 16%;
+    --w4: 32%;
   }
 }
 
@@ -1347,6 +1349,80 @@ kbd.live {
   background: var(--ok);
 }
 
+/* infobulle d'un objet (survol, page Builds) : verre dépoli au-dessus de tout */
+.has-tip {
+  cursor: help;
+}
+
+#itemTip {
+  position: fixed;
+  z-index: 30;
+  width: 300px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--float);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--ring), var(--shadow-float);
+  backdrop-filter: blur(24px) saturate(1.6);
+  pointer-events: none;
+  font-size: 12.5px;
+  animation: toast-in 0.12s var(--ease);
+}
+
+#itemTip .tt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#itemTip .tt-head .ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+#itemTip .tt-head > div {
+  min-width: 0;
+}
+
+#itemTip .tt-head b {
+  display: block;
+  font-size: 14px;
+}
+
+#itemTip .tt-plain {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+#itemTip .tt-stats {
+  margin: 8px 0 0;
+  padding: 7px 10px;
+  list-style: none;
+  border-radius: 10px;
+  background: var(--well);
+  display: grid;
+  gap: 2px;
+}
+
+#itemTip .tt-stats li {
+  font-weight: 600;
+}
+
+#itemTip .tt-eff {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+#itemTip .tt-eff b {
+  color: var(--accent);
+}
+
+#itemTip .tt-eff.active b {
+  color: var(--warn);
+}
+
 /* ---------------- textes : jamais coupés, ils passent à la ligne ---------------- */
 .page,
 .side {
@@ -1590,6 +1666,11 @@ kbd,
 
 .ic.round {
   border-radius: 50%;
+}
+
+/* portraits de champion : Riot y dessine un liseré sombre, on le rogne pour qu'ils remplissent les cases arrondies */
+img[src*='/img/champion/'] {
+  object-view-box: inset(7%);
 }
 
 .ic.big {
@@ -2318,7 +2399,7 @@ kbd,
   gap: 20px;
 }
 
-.lv-empty.with-mascot > div {
+.lv-empty.with-mascot > div:not(.mascot) {
   flex: 1;
   min-width: 0;
 }

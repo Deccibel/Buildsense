@@ -21,7 +21,46 @@
   const rand = (a, b) => a + Math.random() * (b - a);
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function build(size) {
+  /*
+   * Accessoires (désactivés par défaut), dessinés dans le même repère 100×100 que les yeux.
+   * « face » : bougent avec le regard (lunettes) ; « body » : suivent la bille (chapeau, nœud, cravate).
+   */
+  const ACCESSORIES = {
+    glasses: {
+      layer: 'face',
+      svg: '<g class="a-frame"><circle cx="37" cy="50" r="12.5"/><circle cx="63" cy="50" r="12.5"/><path d="M49.5 48 Q50 45.5 50.5 48"/><path d="M24.5 49 L13 45.5"/><path d="M75.5 49 L87 45.5"/></g>',
+    },
+    readers: {
+      layer: 'face',
+      svg: '<g class="a-frame"><path d="M24 52 H50 A13 13 0 0 1 24 52 Z"/><path d="M50 52 H76 A13 13 0 0 1 50 52 Z"/><path d="M24 52 L13 47"/><path d="M76 52 L87 47"/></g>',
+    },
+    bowtie: {
+      layer: 'body',
+      svg: '<g class="a-bow"><path d="M50 85 L37 78 Q34 85 37 92 Z"/><path d="M50 85 L63 78 Q66 85 63 92 Z"/><rect x="46.3" y="81.3" width="7.4" height="7.4" rx="2.4"/></g>',
+    },
+    tie: {
+      layer: 'body',
+      svg: '<g class="a-tie"><path d="M44.5 72 H55.5 L53 79 H47 Z"/><path d="M47 79 H53 L57.5 99 L50 106 L42.5 99 Z"/><path class="a-stripe" d="M48 85 L55 92 M46.5 92 L56 101"/></g>',
+    },
+    cap: {
+      layer: 'body',
+      svg: '<g class="a-cap"><path d="M31 9 V18 Q50 27 69 18 V9 Z"/><path class="a-board" d="M50 -7 L87 6 L50 19 L13 6 Z"/><path class="a-tassel" d="M50 6 L80 11 V25"/><circle class="a-tassel-end" cx="80" cy="27" r="3.2"/></g>',
+    },
+  };
+
+  function accessoryLayer(names, layer) {
+    const parts = names.map((n) => ACCESSORIES[n]).filter((a) => a && a.layer === layer);
+    if (!parts.length) return null;
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', `m-acc m-acc-${layer}`);
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('aria-hidden', 'true');
+    // dessins fixes, écrits ici (aucune donnée extérieure)
+    svg.innerHTML = parts.map((a) => a.svg).join('');
+    return svg;
+  }
+
+  function build(size, accessories = []) {
     const el = document.createElement('div');
     el.className = 'mascot';
     el.style.setProperty('--ms', `${size}px`);
@@ -47,7 +86,11 @@
       svg.append(p);
     }
     look.append(svg);
+    const face = accessoryLayer(accessories, 'face');
+    if (face) look.append(face);
     ball.append(body, look);
+    const worn = accessoryLayer(accessories, 'body');
+    if (worn) ball.append(worn);
     el.append(ball);
     return el;
   }
@@ -56,8 +99,8 @@
    * @param {{ size?: number, idle?: boolean, track?: boolean, clickable?: boolean, sleepAfter?: number }} opts
    *   idle : gestes spontanés ; track : suit le curseur ; sleepAfter : secondes sans activité avant de s'endormir (0 = jamais)
    */
-  function create({ size = 44, idle = true, track = true, clickable = false, sleepAfter = 150 } = {}) {
-    const el = build(size);
+  function create({ size = 44, idle = true, track = true, clickable = false, sleepAfter = 150, accessories = [] } = {}) {
+    const el = build(size, accessories);
     let base = 'idle';
     let temp = null;
     let tempTimer = null;
@@ -231,5 +274,5 @@
     return api;
   }
 
-  window.StonksMascot = { create, MOODS, MOVES };
+  window.StonksMascot = { create, MOODS, MOVES, ACCESSORIES: Object.keys(ACCESSORIES) };
 })();

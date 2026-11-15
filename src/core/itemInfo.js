@@ -123,6 +123,27 @@ function passiveOf(desc) {
   return text ? { name: m[1].trim(), text } : null;
 }
 
+const clean = (s) => stripTags(s).replace(/\s+/g, ' ').replace(/\s+([,.%])/g, '$1').trim();
+const clip = (s, n = 240) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
+
+/**
+ * Infobulle d'un objet, dans la langue d'affichage : ses statistiques ("+105 puissance")
+ * et ses effets passifs / actifs ({ kind, name, text }).
+ */
+function tipOf(desc) {
+  const d = String(desc || '');
+  const sm = /<stats>([\s\S]*?)<\/stats>/i.exec(d);
+  const stats = sm ? sm[1].split(/<br\s*\/?>/i).map(clean).filter(Boolean) : [];
+  const effects = [];
+  const re = /<(passive|active)>([^<]+)<\/\1>(?:\s*<br\s*\/?>)?([\s\S]*?)(?=<br\s*\/?>\s*<br\s*\/?>|<(?:passive|active)>|<\/mainText>|$)/gi;
+  let m;
+  while ((m = re.exec(d)) && effects.length < 4) {
+    const text = clean(m[3]);
+    if (text) effects.push({ kind: m[1].toLowerCase(), name: clean(m[2]), text: clip(text) });
+  }
+  return { stats, effects };
+}
+
 /**
  * @param {number} id
  * @param {object} it  objet dans la langue d'affichage
@@ -177,7 +198,8 @@ function classifyItem(id, it, en) {
     // objet obtenu par transformation d'un autre (quête de l'objet de support : Atlas -> Boussole -> Trésor)
     specialRecipe: Number(it.specialRecipe || en.specialRecipe) || 0,
     passive: passiveOf(it.description),
+    tip: tipOf(it.description),
   };
 }
 
-module.exports = { classifyItem, parseStats, stripTags, itemClass, passiveOf };
+module.exports = { classifyItem, parseStats, stripTags, itemClass, passiveOf, tipOf };

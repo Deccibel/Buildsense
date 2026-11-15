@@ -2,6 +2,13 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 2.0.1
+
+- Builds : survole un objet pour voir ce qu'il fait (prix, statistiques, effets passifs et actifs), aussi dans le détail d'un build.
+- La mascotte n'est plus écrasée sur la page En direct.
+- Portraits de champion recadrés : ils remplissent bien les cases arrondies.
+- Thème clair : dégradé de couleur plus marqué.
+
 ## 2.0.0
 
 - BuildSense devient Stonks : nouveau nom, nouveau logo et une mascotte, une petite bille en dégradé qui suit ton curseur des yeux, s'occupe toute seule et réagit à ce qui se passe (partie, erreur, notification).

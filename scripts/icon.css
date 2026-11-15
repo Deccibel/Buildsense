@@ -38,3 +38,34 @@ body.sheet #stage {
 body.sheet #stage .mascot {
   margin-top: 0;
 }
+
+/* planche des accessoires (?acc=1) */
+body.acc #stage {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-content: center;
+  gap: 28px;
+  padding: 40px;
+}
+
+body.acc figure {
+  margin: 0;
+  padding: 36px 20px 18px;
+  border-radius: 24px;
+  background: radial-gradient(circle at 20% 0, rgba(80, 120, 255, 0.18), transparent 60%), #141a2a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.acc .sizes {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 26px;
+}
+
+body.acc figcaption {
+  margin-top: 22px;
+  text-align: center;
+  color: #e9edf5;
+  font: 600 22px 'Segoe UI', sans-serif;
+}

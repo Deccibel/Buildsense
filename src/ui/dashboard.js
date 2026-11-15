@@ -562,13 +562,75 @@ function liveHead(vm, source) {
   );
 }
 
+// ---------------------------------------------------------------- infobulles des objets (survol)
+
+const tipped = new WeakMap();
+
+/** Attache l'infobulle d'un objet (prix, résumé, statistiques, effets) à un élément. */
+function withTip(el, item) {
+  if (el && item && item.tip) {
+    tipped.set(el, item);
+    el.classList.add('has-tip');
+  }
+  return el;
+}
+
+function tipBox() {
+  let t = $('#itemTip');
+  if (!t) {
+    t = h('div', { id: 'itemTip', role: 'tooltip', hidden: 'hidden', 'data-float': '' });
+    document.body.append(t);
+  }
+  return t;
+}
+
+function showTip(target) {
+  const it = tipped.get(target);
+  if (!it) return;
+  const tp = it.tip;
+  const t = tipBox();
+  t.replaceChildren(
+    ...[
+    h('div', { class: 'tt-head' }, ico(it.icon, it.name), h('div', null, h('b', null, it.name), tp.cost ? coin(tp.cost) : null)),
+    tp.plain ? h('p', { class: 'tt-plain' }, tp.plain) : null,
+    tp.stats.length ? h('ul', { class: 'tt-stats' }, tp.stats.map((x) => h('li', null, x))) : null,
+    tp.effects.map((e) => h('p', { class: `tt-eff ${e.kind}` }, h('b', null, `${e.kind === 'active' ? 'Actif' : 'Passif'} · ${e.name} : `), e.text)),
+    ].flat().filter(Boolean),
+  );
+  t.hidden = false;
+  const r = target.getBoundingClientRect();
+  const w = t.offsetWidth;
+  const hh = t.offsetHeight;
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  const left = Math.max(10, Math.min(vw - w - 10, r.left + r.width / 2 - w / 2));
+  const top = r.top - hh - 10 >= 10 ? r.top - hh - 10 : Math.min(vh - hh - 10, r.bottom + 10);
+  t.style.left = `${Math.round(left)}px`;
+  t.style.top = `${Math.round(top)}px`;
+}
+
+function hideTip() {
+  const t = $('#itemTip');
+  if (t) t.hidden = true;
+}
+
+document.addEventListener('pointerover', (e) => {
+  const el = e.target.closest && e.target.closest('.has-tip');
+  if (el) showTip(el);
+});
+document.addEventListener('pointerout', (e) => {
+  const el = e.target.closest && e.target.closest('.has-tip');
+  if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) hideTip();
+});
+document.addEventListener('scroll', hideTip, true);
+
 function lvPath(items, extra) {
   return h(
     'div',
     { class: 'lv-path' },
     items.map((c, i) => [
       i ? h('span', { class: 'chev' }, '›') : null,
-      h('div', { class: `lv-step ${c.owned ? 'owned' : ''} ${c.situational ? 'situ' : ''} ${c.support ? 'sup' : ''}` }, ico(c.icon, c.name), h('span', null, c.name), c.owned ? h('span', { class: 'ok' }, '✓') : null),
+      withTip(h('div', { class: `lv-step ${c.owned ? 'owned' : ''} ${c.situational ? 'situ' : ''} ${c.support ? 'sup' : ''}` }, ico(c.icon, c.name), h('span', null, c.name), c.owned ? h('span', { class: 'ok' }, '✓') : null), c),
     ]),
     extra ? [h('span', { class: 'chev' }, '+'), h('div', { class: 'lv-step' }, ico(extra.icon, extra.name), h('span', null, extra.name))] : null,
   );
@@ -1069,7 +1131,7 @@ function renderBuilds() {
           h('h3', null, v.label, v.favorite ? h('span', { class: 'tag' }, '★ ton build') : null, (v.players || []).some((p) => p.pro) ? h('span', { class: 'tag pro' }, `joué par ${v.players.find((p) => p.pro).pro.name}`) : null),
           h('span', { class: 'meta' }, [v.share ? `${Math.round(v.share * 100)} % des parties` : null, `${fmt(v.n)} parties`, v.wr ? `${Math.round(v.wr * 100)} % de victoires` : null].filter(Boolean).join(' · ')),
         ),
-        h('div', { class: 'b-click', role: 'button', tabindex: '0', title: 'Voir le détail du build', onclick: () => toggleBuild(v), onkeydown: (e) => { if (e.key === 'Enter') toggleBuild(v); } }, lvPath([v.support ? { ...v.support, support: true } : null, v.boots, ...v.items].filter(Boolean)), h('span', { class: 'b-more' }, bOpen === v.id ? 'Masquer le détail ▴' : 'Voir le détail : joueurs, pourquoi ces objets ▾')),
+        h('div', { class: 'b-click', role: 'button', tabindex: '0', 'aria-label': 'Voir le détail du build', onclick: () => toggleBuild(v), onkeydown: (e) => { if (e.key === 'Enter') toggleBuild(v); } }, lvPath([v.support ? { ...v.support, support: true } : null, v.boots, ...v.items].filter(Boolean)), h('span', { class: 'b-more' }, bOpen === v.id ? 'Masquer le détail ▴' : 'Voir le détail : joueurs, pourquoi ces objets ▾')),
         bOpen === v.id ? (bDetail && bDetail.empty ? h('p', { class: 'muted small' }, 'Pas assez de parties pour détailler ce build.') : renderBuildDetail(bDetail)) : null,
         h(
           'div',
@@ -1673,14 +1735,14 @@ function renderBuildDetail(d) {
     h(
       'div',
       { class: 'bd-slot' },
-      h('div', { class: 'bd-item' }, h('span', { class: 'rk' }, String(i + 1)), ico(s.icon, s.name), h('div', null, h('b', null, s.name), h('small', null, [`${pct0(s.share)} à ce moment`, `${pct0(s.wr)} victoires`, s.minute ? `vers ${s.minute} min` : null].filter(Boolean).join(' · ')))),
+      withTip(h('div', { class: 'bd-item' }, h('span', { class: 'rk' }, String(i + 1)), ico(s.icon, s.name), h('div', null, h('b', null, s.name), h('small', null, [`${pct0(s.share)} à ce moment`, `${pct0(s.wr)} victoires`, s.minute ? `vers ${s.minute} min` : null].filter(Boolean).join(' · ')))), s),
       s.why.length ? h('ul', { class: 'bd-why' }, s.why.map((t) => h('li', null, t))) : null,
       s.alternatives.length
         ? h(
             'div',
             { class: 'bd-alts' },
             h('span', { class: 't' }, 'Plutôt que'),
-            s.alternatives.map((a) => h('span', { class: 'bd-alt', title: a.when.join(', ') }, ico(a.icon, a.name), h('span', null, a.name), h('small', null, `${pct0(a.share)} · ${pct0(a.wr)} V${a.when.length ? ` · ${a.when[0]}` : ''}`))),
+            s.alternatives.map((a) => withTip(h('span', { class: 'bd-alt' }, ico(a.icon, a.name), h('span', null, a.name), h('small', null, `${pct0(a.share)} · ${pct0(a.wr)} V${a.when.length ? ` · ${a.when[0]}` : ''}`)), a)),
           )
         : null,
     ),
@@ -1695,13 +1757,13 @@ function renderBuildDetail(d) {
           h(
             'div',
             { class: `bd-slot ${i === 0 ? 'best' : ''}` },
-            h('div', { class: 'bd-item' }, h('span', { class: 'rk' }, i === 0 ? '★' : ''), ico(o.icon, o.name), h('div', null, h('b', null, o.name), h('small', null, [`${pct0(o.share)} des parties`, o.n >= 8 ? `${pct0(o.wr)} victoires` : null, o.when.length ? `plutôt ${o.when[0]}` : null].filter(Boolean).join(' · ')))),
+            withTip(h('div', { class: 'bd-item' }, h('span', { class: 'rk' }, i === 0 ? '★' : ''), ico(o.icon, o.name), h('div', null, h('b', null, o.name), h('small', null, [`${pct0(o.share)} des parties`, o.n >= 8 ? `${pct0(o.wr)} victoires` : null, o.when.length ? `plutôt ${o.when[0]}` : null].filter(Boolean).join(' · ')))), o),
             o.passive ? h('ul', { class: 'bd-why' }, h('li', null, `${o.passive.name} : ${o.passive.text}`)) : null,
           ),
         ),
       )
     : null;
-  if (d.boots && d.boots.length) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Bottes'), d.boots.map((b) => h('span', { class: 'bd-alt' }, ico(b.icon, b.name), h('span', null, b.name), h('small', null, pct0(b.share))))));
+  if (d.boots && d.boots.length) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Bottes'), d.boots.map((b) => withTip(h('span', { class: 'bd-alt' }, ico(b.icon, b.name), h('span', null, b.name), h('small', null, pct0(b.share))), b))));
   if (d.start) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Départ'), d.start.list.map((it) => ico(it.icon, it.name)), h('small', null, pct0(d.start.share))));
   if (d.spells) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Sorts'), d.spells.list.map((sp) => h('span', { class: 'bd-alt' }, ico(sp.icon, sp.name, 'round'), h('span', null, sp.name))), h('small', null, pct0(d.spells.share))));
   if (d.runes && d.runes.keystone) {

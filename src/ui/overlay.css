@@ -42,7 +42,7 @@
     --muted: #556074;
     --dim: #76829a;
     --accent-hi: color-mix(in srgb, var(--accent) 72%, #000);
-    --tint: 26%;
+    --tint: 42%;
   }
 }
 
@@ -168,6 +168,11 @@ body.move .panel {
 
 .round {
   border-radius: 50%;
+}
+
+/* portraits de champion : Riot y dessine un liseré sombre, on le rogne pour qu'ils remplissent les cases arrondies */
+img[src*='/img/champion/'] {
+  object-view-box: inset(7%);
 }
 
 /* ---------- en-tête ---------- */
@@ -1260,7 +1265,7 @@ ul.why {
   padding: 15px 14px;
 }
 
-.msg > div {
+.msg > div:not(.mascot) {
   flex: 1;
   min-width: 0;
 }

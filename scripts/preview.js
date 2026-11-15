@@ -412,9 +412,16 @@ async function runShots() {
 
   const champs = S.championsList(data);
   const scen = dashboardScenarios(data);
-  for (const name of ['builds', 'meta', 'overlay', 'accueil-en-partie', 'accueil-maj-prete', 'accueil-maj-telechargement', 'direct-partie', 'direct-selection', 'direct-aram', 'champions', 'reglages']) {
+  for (const name of ['builds', 'meta', 'overlay', 'accueil-en-partie', 'accueil-maj-prete', 'accueil-maj-telechargement', 'direct-partie', 'direct-selection', 'direct-aram', 'direct-vide', 'champions', 'reglages']) {
     const w = await renderDashboard(scen[name].state, champs, scen[name].page, [1180, 860]);
     fs.writeFileSync(path.join(OUT, `fenetre-${name}.png`), (await w.webContents.capturePage()).toPNG());
+  }
+  // infobulle d'un objet au survol (page Builds)
+  {
+    const w = await renderDashboard(scen.builds.state, champs, 'builds', [1180, 860]);
+    await w.webContents.executeJavaScript("document.querySelectorAll('.lv-step.has-tip')[2].dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))");
+    await wait(250);
+    fs.writeFileSync(path.join(OUT, 'fenetre-builds-infobulle.png'), (await w.webContents.capturePage()).toPNG());
   }
   for (const [theme, accent] of APPEARANCES) {
     nativeTheme.themeSource = theme;

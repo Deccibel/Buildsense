@@ -3,6 +3,12 @@
 /** Données des onglets Builds et Meta de la fenêtre principale. */
 
 /** Onglet Builds : variantes du champion à ce poste, et celles des joueurs suivis. */
+/** Infobulle d'un objet (page Builds) : prix, résumé, statistiques, effets. */
+function itemTip(it) {
+  const t = it.tip || { stats: [], effects: [] };
+  return { cost: (it.gold && it.gold.total) || 0, plain: it.plaintext || '', stats: t.stats, effects: t.effects };
+}
+
 function buildsView({ dd, rec, followed = [], presets = {}, pros = null }, champKey, role, family = 'sr') {
   if (!champKey) return null;
   const champ = dd.champion(champKey);
@@ -12,7 +18,7 @@ function buildsView({ dd, rec, followed = [], presets = {}, pros = null }, champ
   const preset = family === 'sr' ? (presets || {})[`${champKey}|${used}`] || null : null;
   const item = (id) => {
     const it = dd.item(id);
-    return it ? { id, name: it.name, icon: dd.itemIcon(id) } : null;
+    return it ? { id, name: it.name, icon: dd.itemIcon(id), tip: itemTip(it) } : null;
   };
   const same = (a, b) => a && b && a.length === b.length && a.every((x, i) => x === b[i]);
   return {
@@ -89,10 +95,18 @@ function buildDetailView({ dd, rec, followed = [], pros = null }, champKey, role
   };
   const item = (id) => {
     const it = dd.item(id);
-    return it ? { id, name: it.name, icon: dd.itemIcon(id) } : null;
+    return it ? { id, name: it.name, icon: dd.itemIcon(id), tip: itemTip(it) } : null;
+  };
+  // infobulles des objets (survol)
+  const withTip = (x) => {
+    const it = x && x.id ? dd.item(x.id) : null;
+    return it ? { ...x, tip: itemTip(it) } : x;
   };
   return {
     ...d,
+    slots: (d.slots || []).map((sl) => ({ ...withTip(sl), alternatives: (sl.alternatives || []).map(withTip) })),
+    boots: Array.isArray(d.boots) ? d.boots.map(withTip) : d.boots,
+    support: d.support ? { ...d.support, options: d.support.options.map(withTip) } : d.support,
     runes,
     spells: d.spells ? { share: d.spells.share, list: d.spells.ids.map(spell).filter(Boolean) } : null,
     start: d.start ? { share: d.start.share, list: d.start.ids.map(item).filter(Boolean) } : null,
