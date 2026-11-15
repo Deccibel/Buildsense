@@ -107,7 +107,7 @@ body.preview {
   --bg-a: calc(var(--opacity) * 0.98);
   position: relative;
   width: 340px;
-  border: 1px solid var(--edge);
+  border: 1px solid rgba(var(--fg-rgb), 0.07);
   border-radius: 18px;
   background:
     radial-gradient(380px 170px at 0 0, color-mix(in srgb, var(--a2) var(--tint), transparent), transparent 72%),
@@ -119,14 +119,21 @@ body.preview {
   opacity: clamp(0.72, calc(var(--opacity) + 0.3), 1);
 }
 
-/* filet du haut : le dégradé de l'accent */
+/* contour : le dégradé de l'accent part du haut et se fond le long des bords du panneau */
 .panel::before {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--a1), var(--a2) 40%, var(--a3) 78%, transparent);
-  opacity: 0.9;
+  inset: 0;
+  z-index: 1;
+  padding: 1.6px;
+  border-radius: inherit;
+  background: linear-gradient(100deg, var(--a1), var(--a2) 42%, var(--a3) 78%, var(--a4));
+  /* un anneau (tout sauf l'intérieur) qui s'estompe vers le bas */
+  mask:
+    linear-gradient(180deg, #000 0, #000 12%, rgba(0, 0, 0, 0.45) 45%, rgba(0, 0, 0, 0.12) 80%, transparent 100%),
+    linear-gradient(#000 0 0) content-box;
+  mask-composite: subtract;
+  pointer-events: none;
 }
 
 body.move .panel {

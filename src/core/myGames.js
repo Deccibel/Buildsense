@@ -204,7 +204,10 @@ function trends(games, role = '') {
   const out = [];
   for (const m of METRICS) {
     if (m.skip && m.skip.includes(role)) continue;
-    const series = list.map((g) => g[m.id]).filter((x) => Number.isFinite(x));
+    const played = list.filter((g) => Number.isFinite(g[m.id]));
+    const series = played.map((g) => g[m.id]);
+    // courbe de ton adversaire direct, partie par partie (écart d'or : la référence est 0)
+    const oppSeries = played.map((g) => (m.bench0 ? 0 : g.opp && Number.isFinite(g.opp[m.id]) ? g.opp[m.id] : null));
     if (series.length < 3) continue;
     const mine = avg(series);
     const bench = m.bench0 ? 0 : avg(list.map((g) => (g.opp ? g.opp[m.id] : null)));
@@ -220,7 +223,7 @@ function trends(games, role = '') {
     let gap = null;
     if (bench !== null && !m.bench0 && bench > 0) gap = m.better === 'high' ? (bench - mine) / bench : (mine - bench) / bench;
     if (m.bench0) gap = mine < -250 ? Math.min(0.5, -mine / 2000) : 0;
-    out.push({ id: m.id, label: m.label, better: m.better, digits: m.digits, pct: !!m.pct, signed: !!m.signed, goal: m.goal || null, n: series.length, mine, bench, trend, gap, series: series.slice().reverse() });
+    out.push({ id: m.id, label: m.label, better: m.better, digits: m.digits, pct: !!m.pct, signed: !!m.signed, goal: m.goal || null, n: series.length, mine, bench, trend, gap, series: series.slice().reverse(), oppSeries: oppSeries.slice().reverse() });
   }
   return out;
 }

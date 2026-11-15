@@ -210,8 +210,8 @@ function goto(page) {
   if (page === 'live') {
     renderLive(state, true);
     if (state) renderCoach(state, true);
-    if (state) renderProgress(state, true);
   }
+  if (page === 'progress' && state) renderProgress(state, true);
 }
 
 // ---------------------------------------------------------------- rendu
@@ -1844,21 +1844,6 @@ function fmtMetric(t, v) {
 }
 
 /** Petite courbe (parties de la plus ancienne à la plus récente). */
-function sparkline(series, good) {
-  const w = 96;
-  const hh = 26;
-  const min = Math.min(...series);
-  const max = Math.max(...series);
-  const span = max - min || 1;
-  const pts = series.map((v, i) => `${((i / Math.max(1, series.length - 1)) * (w - 4) + 2).toFixed(1)},${(hh - 3 - ((v - min) / span) * (hh - 6)).toFixed(1)}`).join(' ');
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', `0 0 ${w} ${hh}`);
-  svg.setAttribute('class', `spark ${good}`);
-  const pl = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  pl.setAttribute('points', pts);
-  svg.append(pl);
-  return svg;
-}
 
 const mmss = (m) => `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')}`;
 
@@ -1891,9 +1876,60 @@ function gameDetail(g) {
   );
 }
 
+/** Courbes partie par partie : toi (dégradé de l'accent) contre ton adversaire direct (pointillés). */
+function compareChart(t) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const w = 180;
+  const hh = 46;
+  const mine = t.series;
+  const opp = t.oppSeries || [];
+  const vals = [...mine, ...opp].filter((v) => Number.isFinite(v));
+  if (mine.length < 2 || !vals.length) return null;
+  let min = Math.min(...vals);
+  let max = Math.max(...vals);
+  if (max - min < 1e-9) {
+    min -= 1;
+    max += 1;
+  }
+  const x = (i) => ((i / Math.max(1, mine.length - 1)) * (w - 10) + 5).toFixed(1);
+  const y = (v) => (hh - 5 - ((v - min) / (max - min)) * (hh - 10)).toFixed(1);
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${hh}`);
+  svg.setAttribute('class', 'cmp');
+  const line = (series, cls) => {
+    // une partie sans adversaire connu coupe la courbe
+    let seg = [];
+    const flush = () => {
+      if (seg.length > 1) {
+        const pl = document.createElementNS(NS, 'polyline');
+        pl.setAttribute('points', seg.join(' '));
+        pl.setAttribute('class', cls);
+        svg.append(pl);
+      }
+      seg = [];
+    };
+    series.forEach((v, i) => (Number.isFinite(v) ? seg.push(`${x(i)},${y(v)}`) : flush()));
+    flush();
+  };
+  line(opp, 'opp');
+  line(mine, 'me');
+  const last = mine.length - 1;
+  const dot = document.createElementNS(NS, 'circle');
+  dot.setAttribute('cx', x(last));
+  dot.setAttribute('cy', y(mine[last]));
+  dot.setAttribute('r', '3');
+  dot.setAttribute('class', 'me-dot');
+  svg.append(dot);
+  const o = opp[last];
+  const title = document.createElementNS(NS, 'title');
+  title.textContent = `Dernière partie : toi ${fmtMetric(t, mine[last])}${Number.isFinite(o) && t.id !== 'gd15' ? ` · ton adversaire ${fmtMetric(t, o)}` : ''}`;
+  svg.append(title);
+  return svg;
+}
+
 function renderProgress(s, force = false) {
   const box = $('#progressView');
-  if (!box || ($('#page-live').hidden && !force)) return;
+  if (!box || ($('#page-progress').hidden && !force)) return;
   const p = s.progress;
   const key = JSON.stringify([p, gameOpen, gameOpenAuto]);
   if (key === lastProgressKey && !force) return;
@@ -1903,7 +1939,7 @@ function renderProgress(s, force = false) {
   const head = h(
     'div',
     { class: 'lv-t' },
-    h('h3', null, 'Ta progression'),
+    h('h3', null, 'Ton objectif'),
     h('span', { class: 'meta' }, [p.riotId, p.syncing ? 'mise à jour…' : p.waiting ? 'bilan de ta dernière partie en cours de récupération…' : null].filter(Boolean).join(' · ')),
   );
   if (!p.total) {
@@ -1943,7 +1979,7 @@ function renderProgress(s, force = false) {
     ? h(
         'table',
         { class: 'pg-trends' },
-        h('tr', null, h('th', null, `${p.n} dernières parties`), h('th', null, 'Toi'), h('th', { title: 'Moyenne de tes adversaires directs : même poste, même niveau' }, 'Tes adversaires'), h('th', null, 'Évolution'), h('th', null, '')),
+        h('tr', null, h('th', null, `${p.n} dernières parties`), h('th', null, 'Toi'), h('th', { title: 'Moyenne de tes adversaires directs : même poste, même niveau' }, 'Tes adversaires'), h('th', null, 'Évolution'), h('th', null, h('span', { class: 'cmp-key' }, h('i', { class: 'me' }), 'toi ', h('i', { class: 'opp' }), 'ton adversaire'))),
         p.trends.map((t) => {
           const behind = t.gap !== null && t.gap >= 0.08;
           const aheadOf = t.gap !== null && t.gap <= -0.05;
@@ -1954,7 +1990,7 @@ function renderProgress(s, force = false) {
             h('td', { class: `me ${behind ? 'bad' : aheadOf ? 'good' : ''}` }, fmtMetric(t, t.mine)),
             h('td', null, t.id === 'gd15' ? '–' : fmtMetric(t, t.bench)),
             h('td', { class: t.trend > 0 ? 'good' : t.trend < 0 ? 'bad' : 'muted' }, t.trend > 0 ? '↗ en progrès' : t.trend < 0 ? '↘ en recul' : '→ stable'),
-            h('td', null, t.series.length >= 4 ? sparkline(t.series, t.trend > 0 ? 'good' : t.trend < 0 ? 'bad' : '') : null),
+            h('td', { class: 'cmp-cell' }, t.series.length >= 3 ? compareChart(t) : null),
           );
         }),
       )
@@ -1984,16 +2020,12 @@ function renderProgress(s, force = false) {
   );
 
   box.replaceChildren(
+    h('div', { class: 'card lv-card pg-card' }, head, goalBox),
+    h('div', { class: 'card lv-card pg-card' }, h('div', { class: 'lv-t' }, h('h3', null, 'Tes tendances'), h('span', { class: 'meta' }, 'comparées à tes adversaires directs')), filter, trendsEl),
     h(
       'div',
       { class: 'card lv-card pg-card' },
-      head,
-      goalBox,
-      h('h4', null, 'Tes tendances'),
-      filter,
-      trendsEl,
-      h('h4', null, 'Tes dernières parties'),
-      h('p', { class: 'muted small' }, 'Clique sur une partie pour son bilan complet, face à ton adversaire direct.'),
+      h('div', { class: 'lv-t' }, h('h3', null, 'Tes dernières parties'), h('span', { class: 'meta' }, 'clique sur une partie pour son bilan complet')),
       gamesEl,
       h('div', { class: 'btns' }, h('button', { class: 'btn ghost small', disabled: p.syncing ? '' : null, onclick: syncProgress }, p.syncing ? 'Mise à jour…' : 'Actualiser'), p.error ? h('span', { class: 'msg warn' }, p.error) : null),
     ),

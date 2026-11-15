@@ -33,6 +33,10 @@
           <span class="nav-label">En direct</span>
           <span class="live-dot" id="liveDot" hidden></span>
         </button>
+        <button class="nav" data-page="progress">
+          <svg viewBox="0 0 24 24"><path d="m3.5 16.5 5.5-5.5 4 4 7.5-7.5" /><path d="M15 7.5h5.5V13" /></svg>
+          Progression
+        </button>
         <button class="nav" data-page="builds">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></svg>
           Builds
@@ -115,16 +119,24 @@
       <section class="page" id="page-live" hidden>
         <header class="page-head">
           <h1>En direct</h1>
-          <p>Ta partie en temps réel, puis ton bilan, tes tendances et ton objectif. L'overlay reste affiché par-dessus le jeu.</p>
+          <p>Ta partie en temps réel, puis le bilan de ta dernière partie. L'overlay reste affiché par-dessus le jeu.</p>
         </header>
         <div id="displayWarn"></div>
         <div id="liveView"></div>
         <div id="coachView"></div>
-        <div id="progressView"></div>
         <label class="switch-row card slim">
           <span><b>Ouvrir cette page au début de chaque partie</b><small>Sans prendre le focus : ton jeu reste au premier plan</small></span>
           <span class="switch"><input type="checkbox" id="autoLivePage" /><i></i></span>
         </label>
+      </section>
+
+      <!-- ============ PROGRESSION ============ -->
+      <section class="page" id="page-progress" hidden>
+        <header class="page-head">
+          <h1>Progression</h1>
+          <p>Ton objectif de session, tes tendances sur tes 20 dernières parties face à tes adversaires directs, et le bilan de chaque partie.</p>
+        </header>
+        <div id="progressView"></div>
       </section>
 
       <!-- ============ BUILDS ============ -->

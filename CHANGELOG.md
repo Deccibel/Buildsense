@@ -2,6 +2,12 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 2.0.2
+
+- Nouvelle page Progression : ton objectif de session, tes tendances et tes dernières parties ont leur propre onglet.
+- Tendances : une courbe par indicateur, partie par partie, toi contre ton adversaire direct.
+- Overlay : le dégradé du haut se prolonge et se fond le long du contour du panneau.
+
 ## 2.0.1
 
 - Builds : survole un objet pour voir ce qu'il fait (prix, statistiques, effets passifs et actifs), aussi dans le détail d'un build.

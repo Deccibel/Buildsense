@@ -223,6 +223,41 @@ function dashboardState({ dd, store }, { live = null, rolePrefs = {}, phase = 'L
     version: '1.3.0',
     update: updateState(update),
     whatsNew: whatsNew ? { version: '1.3.0', previous: '1.2.0', notes: UPDATE_NOTES } : null,
+    progress: progressState({ dd }),
+  };
+}
+
+/** Historique factice (page Progression) : 14 parties Mid d'Ahri, avec l'adversaire direct de chaque partie. */
+function progressState({ dd }) {
+  const myGamesLib = require('../../src/core/myGames');
+  const champOf = (k) => {
+    const c = dd.champion(k);
+    return c ? { key: k, name: c.name, icon: dd.championIcon(c) } : null;
+  };
+  const opps = [R.K.Zed, R.K.Syndra, R.K.Zed, R.K.Syndra];
+  const games = Array.from({ length: 14 }, (_, i) => {
+    // i = 0 : la plus récente ; le joueur progresse au fil des parties
+    const t = 1 - i / 13;
+    const wave = Math.sin(i * 1.7);
+    return {
+      id: `EUW1_${7000 - i}`, queue: 420, r: 'MIDDLE', c: R.K.Ahri, o: opps[i % 4], w: (i * 7) % 3 !== 0,
+      k: 4 + (i % 5), de: 5 - Math.round(t * 2), a: 6 + (i % 4), d: 28 + (i % 6), at: Date.UTC(2026, 10, 15) - i * 86400000,
+      cs10: Math.round(58 + t * 18 + wave * 5), csMin: +(6.1 + t * 1.4 + wave * 0.4).toFixed(1), d10: +(1.4 - t + Math.max(0, wave) * 0.6).toFixed(1),
+      visMin: +(0.55 + t * 0.25 + wave * 0.08).toFixed(2), kp: +(0.48 + t * 0.12 + wave * 0.05).toFixed(2), gd15: Math.round(-400 + t * 700 + wave * 300),
+      opp: { cs10: Math.round(70 + wave * 6), csMin: +(7.2 - wave * 0.3).toFixed(1), d10: +(0.6 + Math.max(0, -wave) * 0.5).toFixed(1), de: 4, visMin: +(0.72 + wave * 0.05).toFixed(2), kp: 0.56, k: 5, a: 7, dmg: 0.27 },
+      dmg: +(0.22 + t * 0.06).toFixed(2), wards: 9 + (i % 4), cw: 1 + (i % 2), deaths: [4.5, 12, 21].slice(0, 1 + (i % 3)),
+      goal: i < 4 ? { id: 'cs10', ok: i % 2 === 0 } : null,
+    };
+  });
+  const tr = myGamesLib.trends(games, 'MIDDLE');
+  const weak = myGamesLib.weakness(tr);
+  const goal = myGamesLib.pickGoal('auto', tr, 'MIDDLE');
+  return {
+    role: 'MIDDLE', champKey: 0, champs: [{ ...champOf(R.K.Ahri), n: 14 }], n: games.length, total: games.length, trends: tr,
+    weakness: weak ? { id: weak.id, label: weak.label } : null,
+    goal: { ...goal, choice: 'auto', recent: 4, ok: 2 },
+    games: games.map((g) => ({ ...g, champ: champOf(g.c), oppChamp: champOf(g.o), queueLabel: myGamesLib.queueLabel(g.queue), comparable: true, firstItem: null })),
+    riotId: 'Joueur#EUW', hasKey: true, syncing: false, waiting: false, error: null,
   };
 }
 

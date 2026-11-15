@@ -296,6 +296,7 @@ function dashboardScenarios(data) {
     'direct-vide': { page: 'live', state: S.dashboardState(data, {}) },
     champions: { page: 'champs', state: S.dashboardState(data, { rolePrefs: pref }) },
     builds: { page: 'builds', state: S.dashboardState(data, {}) },
+    progression: { page: 'progress', state: S.dashboardState(data, {}) },
     meta: { page: 'meta', state: S.dashboardState(data, {}) },
     overlay: { page: 'overlay', state: S.dashboardState(data, {}) },
     reglages: { page: 'settings', state: S.dashboardState(data, {}) },
@@ -337,6 +338,7 @@ function themedScenarios(data, appearance) {
     accueil: { page: 'home', state: S.dashboardState(data, { appearance, update: 'ready' }) },
     direct: { page: 'live', state: S.dashboardState(data, { appearance, live: { source: 'game', vm: vms['partie-faille'] }, phase: 'InProgress' }) },
     reglages: { page: 'settings', state: S.dashboardState(data, { appearance }) },
+    progression: { page: 'progress', state: S.dashboardState(data, { appearance }) },
   };
 }
 
@@ -412,7 +414,7 @@ async function runShots() {
 
   const champs = S.championsList(data);
   const scen = dashboardScenarios(data);
-  for (const name of ['builds', 'meta', 'overlay', 'accueil-en-partie', 'accueil-maj-prete', 'accueil-maj-telechargement', 'direct-partie', 'direct-selection', 'direct-aram', 'direct-vide', 'champions', 'reglages']) {
+  for (const name of ['builds', 'meta', 'overlay', 'accueil-en-partie', 'accueil-maj-prete', 'accueil-maj-telechargement', 'direct-partie', 'direct-selection', 'direct-aram', 'direct-vide', 'progression', 'champions', 'reglages']) {
     const w = await renderDashboard(scen[name].state, champs, scen[name].page, [1180, 860]);
     fs.writeFileSync(path.join(OUT, `fenetre-${name}.png`), (await w.webContents.capturePage()).toPNG());
   }
@@ -426,7 +428,7 @@ async function runShots() {
   for (const [theme, accent] of APPEARANCES) {
     nativeTheme.themeSource = theme;
     const t = themedScenarios(data, { theme, accent });
-    for (const name of ['direct', 'reglages']) {
+    for (const name of ['direct', 'reglages', 'progression']) {
       const w = await renderDashboard(t[name].state, champs, t[name].page, [1180, 860]);
       fs.writeFileSync(path.join(OUT, `theme-${theme}-${accent}-${name}.png`), (await w.webContents.capturePage()).toPNG());
     }

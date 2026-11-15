@@ -492,7 +492,7 @@ async function devShots(dir) {
   await js("document.querySelector('.co-res .btn:last-child') && document.querySelector('.co-res .btn:last-child').click()");
   await wait(300);
   await shot('live-coach-guide');
-  await js("document.querySelector('#progressView').scrollIntoView()");
+  await js("document.querySelector('[data-page=progress]').click()");
   await wait(400);
   await shot('progress-1');
   await js("document.querySelector('main').scrollBy(0, 560)");
