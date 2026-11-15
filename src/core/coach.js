@@ -130,6 +130,28 @@ class GameCoach {
     this.lastDeaths = 0;
     this.champKey = 0;
     this.last = null;
+    this.firstT = null;
+    this.cs10 = null; // sbires à 10 min (connu seulement si BuildSense suivait la partie avant)
+    this.d10 = null; // morts avant 10 min
+  }
+
+  /** Valeurs en direct pour l'objectif de session. */
+  liveStats() {
+    const g = this.last;
+    if (!g || !g.me) return null;
+    const sc = g.me.scores || {};
+    const kills = sc.kills || 0;
+    return {
+      time: g.gameTime || 0,
+      cs: sc.creepScore || 0,
+      deaths: sc.deaths || 0,
+      kills,
+      assists: sc.assists || 0,
+      teamKills: kills + g.allies.reduce((s, p) => s + ((p.scores && p.scores.kills) || 0), 0),
+      vision: sc.wardScore || 0,
+      cs10: this.cs10,
+      d10: this.d10,
+    };
   }
 
   /** Échantillon de la partie (appelé à chaque lecture de la Live Client API). */
@@ -143,7 +165,10 @@ class GameCoach {
     this.samples++;
     const me = game.me;
     if (!me.isDead && me.gold >= 1500 && t > 120) this.hoardSec += dt;
+    if (this.firstT === null) this.firstT = t;
     const deaths = (me.scores && me.scores.deaths) || 0;
+    if (t < 600) this.d10 = deaths; // le total des morts est connu même si BuildSense arrive en cours de partie
+    else if (this.cs10 === null && this.firstT < 600) this.cs10 = (me.scores && me.scores.creepScore) || 0;
     if (deaths > this.lastDeaths) for (let i = this.lastDeaths; i < deaths; i++) this.deathTimes.push(t);
     this.lastDeaths = deaths;
     for (const id of me.items || []) {

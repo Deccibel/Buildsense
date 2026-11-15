@@ -291,12 +291,25 @@ function fullSection(vm) {
   );
 }
 
+/** Objectif de session : avancement en direct. */
+function goalSection(vm) {
+  const g = vm.goal;
+  if (!g) return null;
+  return h(
+    'div',
+    { class: `goal ${g.state}` },
+    h('div', { class: 'goal-line' }, h('span', { class: 'gt' }, g.title), h('span', { class: 'gv' }, g.value), h('span', { class: 'gs' }, g.text)),
+    h('div', { class: 'goal-bar' }, h('span', { style: { width: `${Math.round((g.progress || 0) * 100)}%` } })),
+  );
+}
+
 function renderIngame(vm) {
   return [
     header(
       vm.header,
       h('div', { class: 'right' }, h('div', { class: 'goldpill' }, h('span', { class: 'coin' }), vm.header.gold), h('div', { class: 'clock' }, vm.header.clock)),
     ),
+    goalSection(vm),
     startersSection(vm),
     enemiesSection(vm),
     optionsSection(vm),

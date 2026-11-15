@@ -2,6 +2,13 @@
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
 
+## 1.8.0
+
+- Bilan complet après chaque partie : sbires à 10 min, écart d'or à 15 min, morts avant 10 min, vision, participation, part des dégâts, face à ton adversaire direct, avec la minute de chaque mort à revoir dans le replay.
+- Historique et tendances sur tes 20 dernières parties, par poste ou par champion, comparées à tes adversaires directs (ton niveau), avec ton point faible récurrent.
+- Objectif de session : un seul objectif par partie (automatique d'après ton point faible, ou au choix), suivi en direct dans l'overlay, même en mode compact, et validé par le bilan.
+- Tes parties sont récupérées dès que le client LoL est ouvert (Riot ID lu dans le client), jamais pendant une partie.
+
 ## 1.7.1
 
 - Raccourcis clavier actifs pendant la partie, même quand le jeu a le focus (mode compact, afficher/masquer, poste…) : plus besoin de revenir sur BuildSense.

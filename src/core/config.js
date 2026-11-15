@@ -19,6 +19,10 @@ const DEFAULTS = {
   collectModes: { sr: true, aram: true, mayhem: true, arena: true, meta: true },
   // meta Platine et moins : collecteurs en parallèle sur d'autres régions (quotas Riot séparés)
   metaMultiRegion: true,
+  // objectif de session (onglet En direct) : 'auto' = ton point faible récurrent, sinon cs10/early/deaths/vision/kp
+  goal: 'auto',
+  // ton compte (Riot ID lu dans le client) : sert à récupérer tes parties pour le bilan et l'historique
+  me: null,
   // mises à jour : 'stable' (publiée chaque jour à 9 h) ou 'beta' (dès qu'elle est prête)
   updateChannel: 'stable',
   favorites: [], // championKeys (nombres) à collecter en priorité

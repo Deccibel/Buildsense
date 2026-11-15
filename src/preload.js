@@ -35,6 +35,9 @@ const INVOKE = new Set([
   'game:fixFso',
   'builds:detail',
   'coach:get',
+  'goal:set',
+  'progress:filter',
+  'progress:sync',
 ]);
 const ON = new Set(['overlay:update', 'overlay:settings', 'overlay:toast', 'state', 'toast']);
 

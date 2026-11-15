@@ -24,6 +24,7 @@ const { spawn } = require('child_process');
 const gameWindow = require('./core/gameWindow');
 const { GameCoach } = require('./core/coach');
 const { KeyWatch } = require('./core/keywatch');
+const myGamesLib = require('./core/myGames');
 
 const OVERLAY_WIDTH = 340;
 const ROOT = path.join(__dirname, '..');
@@ -138,6 +139,7 @@ async function init() {
   setupIcons(userData);
   setupUpdater(userData);
   S.coach = new GameCoach();
+  S.myGames = new myGamesLib.MyGames(path.join(userData, 'my-games.json'));
   S.pros = new Pros({ cacheFile: path.join(userData, 'cache', 'pros.json'), fetchImpl: (url, opts) => net.fetch(url, opts) });
   setTimeout(() => S.pros.refresh(), 8000);
   S.lastGameFile = path.join(userData, 'last-game.json');
@@ -160,6 +162,7 @@ async function init() {
     S.rec.profiles.clear();
     startCrawlerIfPossible();
     pushState();
+    setTimeout(syncMyGames, 5000);
   });
   displayTick();
   liveTick();
@@ -480,6 +483,21 @@ async function devShots(dir) {
   await js("document.querySelector('.co-res .btn:last-child') && document.querySelector('.co-res .btn:last-child').click()");
   await wait(300);
   await shot('live-coach-guide');
+  await js("document.querySelector('#progressView').scrollIntoView()");
+  await wait(400);
+  await shot('progress-1');
+  await js("document.querySelector('main').scrollBy(0, 560)");
+  await wait(300);
+  await shot('progress-2');
+  await js("document.querySelector('main').scrollBy(0, 560)");
+  await wait(300);
+  await shot('progress-3');
+  if (S.overlayWin) fs.writeFileSync(path.join(dir, 'overlay-goal.png'), (await S.overlayWin.webContents.capturePage()).toPNG());
+  S.config.set({ overlay: { compact: true } });
+  pushOverlaySettings();
+  await wait(500);
+  if (S.overlayWin) fs.writeFileSync(path.join(dir, 'overlay-goal-compact.png'), (await S.overlayWin.webContents.capturePage()).toPNG());
+  S.config.set({ overlay: { compact: false } });
   setDemo(null);
   await js("document.querySelector('[data-page=builds]').click()");
   await wait(1500);
@@ -767,6 +785,38 @@ function onGameStart() {
 }
 
 function computeLive(game, mode) {
+  return withGoal(computeLiveBase(game, mode), game);
+}
+
+/** Ajoute à la vue en partie l'objectif de session et son suivi en direct. */
+function withGoal(vm, game) {
+  if (!vm || vm.mode !== 'ingame' || !vm.roleInfo || !vm.roleInfo.roles || !game.me.champ) return vm;
+  const demo = !!S.demo && !S.live.inGame;
+  // l'objectif est fixé au début de la partie (il ne change pas en cours de route)
+  let gg = demo ? null : S.gameGoal;
+  if (!gg || gg.champKey !== game.me.champ.key) {
+    const role = vm.roleInfo.role;
+    const games = S.myGames.comparable({ role });
+    gg = { champKey: game.me.champ.key, role, goal: myGamesLib.pickGoal(S.config.get('goal'), myGamesLib.trends(games, role), role) };
+    if (!demo) S.gameGoal = gg;
+  }
+  let live;
+  if (demo) {
+    const c = new GameCoach();
+    c.update(game, S.dd);
+    live = c.liveStats();
+    // aperçu : valeurs à 10 min estimées (en vraie partie, elles sont relevées en direct)
+    if (live && live.time >= 600) {
+      live.cs10 = Math.round((live.cs * 600) / live.time);
+      live.d10 = 0;
+    }
+  } else live = S.coach.last ? S.coach.liveStats() : null;
+  const g = myGamesLib.liveGoal(gg.goal, live);
+  if (g) vm.goal = g;
+  return vm;
+}
+
+function computeLiveBase(game, mode) {
   return computeIngame({
     dd: S.dd,
     store: S.store,
@@ -961,6 +1011,9 @@ async function liveTick() {
     const raw = await fetchAllGameData();
     if (raw && S.dd.ready) {
       const game = normalizeLive(raw, S.dd);
+      const ap = raw.activePlayer || {};
+      const rid = ap.riotId || (ap.riotIdGameName && ap.riotIdTagLine ? `${ap.riotIdGameName}#${ap.riotIdTagLine}` : null);
+      if (rid && rid.includes('#')) S.liveRiotId = rid;
       if (!S.live.inGame) onGameStart();
       S.live.inGame = true;
       delay = 1000;
@@ -979,6 +1032,7 @@ async function liveTick() {
           S.live.unsupported = null;
           S.activeFamily = mode.family;
           S.live.game = game;
+          S.coach.update(game, S.dd);
           S.live.vm = computeLive(game, mode);
           updateCoach(game, mode);
         }
@@ -1016,7 +1070,6 @@ function coachContext(game, mode) {
 
 function updateCoach(game, mode) {
   if (!S.coach) return;
-  S.coach.update(game, S.dd);
   S.coachMode = mode;
   // le rapport se recalcule toutes les 5 s (il change peu d'une seconde à l'autre)
   if (!S.coachAt || Date.now() - S.coachAt > 5000) {
@@ -1045,6 +1098,141 @@ function finishCoach() {
   S.coach.reset();
   S.coachReport = null;
   S.coachAt = 0;
+  // objectif de la partie : son résultat sera rattaché au bilan complet (API Riot)
+  if (S.gameGoal) S.lastGoal = { ...S.gameGoal, endedAt: Date.now() };
+  S.gameGoal = null;
+  // la partie apparaît dans l'API Riot une à quelques minutes après la fin
+  S.awaitingGame = { since: Date.now(), known: S.myGames.games.length ? S.myGames.games[0].id : null };
+  for (const s of [25, 70, 150, 300, 600]) setTimeout(() => S.awaitingGame && syncMyGames({ count: 5 }), s * 1000);
+}
+
+// ---------------------------------------------------------------- tes parties : bilan, historique, objectif
+
+const keyTag = () => String(S.config.get('apiKey') || '').slice(-8);
+
+/** Ton identifiant pour l'API Riot (propre à la clé API) : résolu depuis ton Riot ID. */
+async function ensureIdentity() {
+  let riotId = S.liveRiotId || null;
+  try {
+    riotId = (await S.lcu.riotId()) || riotId;
+  } catch {
+    /* client fermé */
+  }
+  const me = S.config.get('me');
+  if (me && me.puuid && me.key === keyTag() && me.platform === S.config.get('platform') && (!riotId || me.riotId === riotId)) return me;
+  if (!riotId) return null;
+  const i = riotId.lastIndexOf('#');
+  const acc = await S.api.accountByRiotId(riotId.slice(0, i), riotId.slice(i + 1));
+  if (!acc || !acc.puuid) return null;
+  const next = { riotId, puuid: acc.puuid, key: keyTag(), platform: S.config.get('platform') };
+  S.config.set({ me: next });
+  return next;
+}
+
+/** Récupère tes dernières parties (bilan complet), sans jamais tourner pendant une partie. */
+async function syncMyGames({ count = 20 } = {}) {
+  if (S.syncing || !S.dd.ready || !S.config.get('apiKey') || S.live.inGame) {
+    if (process.env.BUILDSENSE_TIMING) console.log(`[parties] ignoré : syncing=${!!S.syncing} dd=${S.dd.ready} cle=${!!S.config.get('apiKey')} enPartie=${S.live.inGame}`);
+    return;
+  }
+  S.syncing = true;
+  pushStateSoon();
+  try {
+    const me = await ensureIdentity();
+    if (!me) {
+      S.syncError = null;
+      return;
+    }
+    const ids = (await S.api.matchIds(me.puuid, { count, queue: null })) || [];
+    S.skipGames = S.skipGames || new Set();
+    for (const id of ids) {
+      if (S.live.inGame) break;
+      if (S.myGames.has(id) || S.skipGames.has(id)) continue;
+      const match = await S.api.match(id);
+      const timeline = match ? await S.api.timeline(id) : null;
+      const g = match ? myGamesLib.analyzeMatch(match, timeline, me.puuid, S.dd) : null;
+      if (!g) {
+        S.skipGames.add(id);
+        continue;
+      }
+      // l'objectif de la partie qui vient de finir est rattaché à son bilan
+      const lg = S.lastGoal;
+      if (lg && g.c === lg.champKey && Math.abs(g.at - lg.endedAt) < 20 * 60000) {
+        g.goal = myGamesLib.goalResult(lg.goal, g);
+        S.lastGoal = null;
+      }
+      // enregistrée tout de suite : l'historique se remplit au fur et à mesure
+      if (S.myGames.add([g])) {
+        S.awaitingGame = null;
+        pushStateSoon();
+      }
+    }
+    if (S.awaitingGame && Date.now() - S.awaitingGame.since > 15 * 60000) S.awaitingGame = null;
+    S.syncError = null;
+    S.syncedAt = Date.now();
+  } catch (e) {
+    S.syncError = e.message || String(e);
+  } finally {
+    if (process.env.BUILDSENSE_TIMING) console.log(`[parties] ${S.myGames.games.length} en base${S.syncError ? `, erreur : ${S.syncError}` : ''}`);
+    S.syncing = false;
+    pushState();
+  }
+}
+
+/** Données de la carte « Ta progression » (En direct). */
+function progressView() {
+  const me = S.config.get('me');
+  const filter = S.progressChamp || 0;
+  const key = [S.myGames.version, S.config.get('goal'), filter, S.dd.version, S.dd.language].join('|');
+  if (!S.progressCache || S.progressCache.key !== key) {
+    const mg = S.myGames;
+    const role = mg.mainRole();
+    const champOf = (k) => {
+      const c = k && S.dd.ready ? S.dd.champion(k) : null;
+      return c ? { key: k, name: c.name, icon: S.dd.championIcon(c) } : null;
+    };
+    const counts = new Map();
+    for (const g of mg.comparable({ role })) counts.set(g.c, (counts.get(g.c) || 0) + 1);
+    const champs = [...counts.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => ({ ...champOf(k), n })).filter((c) => c.name);
+    const champKey = champs.some((c) => c.key === filter) ? filter : 0;
+    const games = mg.comparable({ role, champKey });
+    const tr = myGamesLib.trends(games, role);
+    const weak = myGamesLib.weakness(tr);
+    const goal = myGamesLib.pickGoal(S.config.get('goal'), myGamesLib.trends(mg.comparable({ role }), role), role);
+    const judged = mg.games.filter((g) => g.goal).slice(0, 5);
+    S.progressCache = {
+      key,
+      value: {
+        role,
+        champKey,
+        champs,
+        n: games.length,
+        total: mg.games.length,
+        trends: tr,
+        weakness: weak ? { id: weak.id, label: weak.label } : null,
+        goal: { ...goal, choice: S.config.get('goal'), recent: judged.length, ok: judged.filter((g) => g.goal.ok).length },
+        games: mg.games.slice(0, 20).map((g) => {
+          const it = g.first && S.dd.ready ? S.dd.item(g.first.id) : null;
+          return {
+            ...g,
+            champ: champOf(g.c),
+            oppChamp: champOf(g.o),
+            queueLabel: myGamesLib.queueLabel(g.queue),
+            comparable: myGamesLib.TREND_QUEUES.has(g.queue) && !!g.r,
+            firstItem: it ? { name: it.name, icon: S.dd.itemIcon(g.first.id), minute: g.first.minute } : null,
+          };
+        }),
+      },
+    };
+  }
+  return {
+    ...S.progressCache.value,
+    riotId: me ? me.riotId : null,
+    hasKey: !!S.config.get('apiKey'),
+    syncing: !!S.syncing,
+    waiting: !!S.awaitingGame,
+    error: S.syncError || null,
+  };
 }
 
 /** Langue du client LoL : lue une fois par session du client. */
@@ -1065,8 +1253,14 @@ async function lcuTick() {
     if (!phase) {
       S.clientLocale = null;
       S.clientQueue = null;
+      S.identityTried = false;
     } else {
       await readClientLocale();
+      const me = S.config.get('me');
+      if (!(me && me.key === keyTag()) && !S.identityTried) {
+        S.identityTried = true;
+        setTimeout(syncMyGames, 1500);
+      }
       S.clientQueue = phase === 'None' ? null : await S.lcu.queue();
       if (S.clientQueue) {
         const m = detectMode({ queueId: S.clientQueue.id, mapNumber: S.clientQueue.mapId, gameMode: S.clientQueue.gameMode });
@@ -1308,6 +1502,7 @@ function fullState() {
       role: currentRoleInfo(),
     },
     live: liveView(),
+    progress: S.myGames ? progressView() : null,
     coach: S.demo && S.demoCoach ? { ...S.demoCoach, demo: true } : S.live.inGame && S.coachReport ? S.coachReport : S.lastGame || null,
     followed: (cfg.followed || []).map((f) => ({ ...f, found: S.followStatus ? S.followStatus[f.id] : undefined })),
     version: PKG.version,
@@ -1404,6 +1599,7 @@ function registerIpc() {
   ipcMain.handle('config:set', (_e, patch) => {
     const p = sanitizeConfig(patch || {});
     S.config.set(p);
+    if ('apiKey' in p || 'platform' in p) setTimeout(syncMyGames, 2000);
     if ('apiKey' in p || 'platform' in p) {
       S.crawler.stop();
       S.crawler.reset();
@@ -1592,6 +1788,21 @@ function registerIpc() {
     } catch {
       /* adresse refusée */
     }
+  });
+  ipcMain.handle('goal:set', (_e, id) => {
+    const v = id === 'auto' || myGamesLib.GOAL_IDS.includes(id) ? id : 'auto';
+    S.config.set({ goal: v });
+    if (!S.live.inGame) S.gameGoal = null;
+    if (S.demo) setDemo(S.demo, { keepOverride: true });
+    return fullState();
+  });
+  ipcMain.handle('progress:filter', (_e, champKey) => {
+    S.progressChamp = Number(champKey) || 0;
+    return fullState();
+  });
+  ipcMain.handle('progress:sync', async () => {
+    await syncMyGames({ count: 20 });
+    return fullState();
   });
   ipcMain.handle('game:setBorderless', async () => {
     if (S.live.inGame) return { ok: false, message: 'Termine ta partie : le mode d’affichage se change hors partie.' };

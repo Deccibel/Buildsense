@@ -150,6 +150,13 @@ class LcuClient {
     return { id: Number(q.id) || 0, mapId: Number(q.mapId) || 0, gameMode: q.gameMode || '' };
   }
 
+  /** Ton Riot ID ("pseudo#tag"), lu dans le client (null si fermé). */
+  async riotId() {
+    const r = await this.request('GET', '/lol-summoner/v1/current-summoner');
+    const d = r.ok && r.data;
+    return d && d.gameName && d.tagLine ? `${d.gameName}#${d.tagLine}` : null;
+  }
+
   /** Langue du client LoL ("fr_FR", "en_US"...) ou null. */
   async locale() {
     const r = await this.request('GET', '/riotclient/region-locale');

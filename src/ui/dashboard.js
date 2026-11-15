@@ -155,6 +155,7 @@ function goto(page) {
   if (page === 'live') {
     renderLive(state, true);
     if (state) renderCoach(state, true);
+    if (state) renderProgress(state, true);
   }
 }
 
@@ -1190,6 +1191,7 @@ function render() {
   renderFollowed(s);
   renderLive(s);
   renderCoach(s);
+  renderProgress(s);
   renderDisplay(s);
   renderChannel(s);
   if (!$('#page-champs').hidden) renderRolePrefs();
@@ -1659,6 +1661,190 @@ function renderChannel(s) {
     ch === 'beta'
       ? 'Bêta : les nouveautés dès qu’elles sont prêtes (versions « PG-date-bN »). Si la version stable est plus récente, tu la reçois aussi.'
       : 'Stable : chaque bêta devient stable le lendemain à 9 h, si aucun souci n’a été trouvé entre-temps.';
+}
+
+// ---------------------------------------------------------------- ta progression (bilan, tendances, objectif)
+
+let lastProgressKey = '';
+let gameOpen = null; // partie dépliée
+let gameOpenAuto = true; // la plus récente est dépliée d'office
+
+const GOAL_CHOICES = [
+  ['auto', 'Auto'],
+  ['cs10', 'Sbires à 10 min'],
+  ['early', 'Zéro mort avant 10 min'],
+  ['deaths', 'Moins de morts'],
+  ['vision', 'Vision'],
+  ['kp', 'Participation'],
+];
+
+function fmtMetric(t, v) {
+  if (v === null || v === undefined) return '–';
+  if (t.pct) return `${Math.round(v * 100)} %`;
+  const s = Number(v).toFixed(t.digits).replace('.', ',');
+  return t.signed && v > 0 ? `+${s}` : s;
+}
+
+/** Petite courbe (parties de la plus ancienne à la plus récente). */
+function sparkline(series, good) {
+  const w = 96;
+  const hh = 26;
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const span = max - min || 1;
+  const pts = series.map((v, i) => `${((i / Math.max(1, series.length - 1)) * (w - 4) + 2).toFixed(1)},${(hh - 3 - ((v - min) / span) * (hh - 6)).toFixed(1)}`).join(' ');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${hh}`);
+  svg.setAttribute('class', `spark ${good}`);
+  const pl = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  pl.setAttribute('points', pts);
+  svg.append(pl);
+  return svg;
+}
+
+const mmss = (m) => `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')}`;
+
+function gameDetail(g) {
+  const o = g.opp;
+  const row = (label, mine, theirs, verdict) => h('tr', { class: verdict || '' }, h('td', null, label), h('td', { class: 'me' }, mine), h('td', null, theirs));
+  const cmp = (a, b, better = 'high') => (a === null || a === undefined || b === null || b === undefined || a === b ? '' : (a > b) === (better === 'high') ? 'good' : 'bad');
+  const num = (v, d = 0) => (v === null || v === undefined ? '–' : Number(v).toFixed(d).replace('.', ','));
+  const rows = [];
+  if (g.comparable && g.r !== 'UTILITY') rows.push(row('Sbires à 10 min', num(g.cs10), o ? num(o.cs10) : '–', cmp(g.cs10, o && o.cs10)));
+  if (g.r !== 'UTILITY') rows.push(row('Sbires par minute', num(g.csMin, 1), o ? num(o.csMin, 1) : '–', cmp(g.csMin, o && o.csMin)));
+  if (g.gd15 !== null && g.gd15 !== undefined) rows.push(row('Or à 15 min (écart)', `${g.gd15 > 0 ? '+' : ''}${fmt(g.gd15)}`, '', g.gd15 > 150 ? 'good' : g.gd15 < -150 ? 'bad' : ''));
+  rows.push(row('Morts avant 10 min', num(g.d10), o ? num(o.d10) : '–', cmp(g.d10, o && o.d10, 'low')));
+  rows.push(row('K / D / A', `${g.k} / ${g.de} / ${g.a}`, o ? `${o.k} / ${o.de} / ${o.a}` : '–', cmp(g.de, o && o.de, 'low')));
+  rows.push(row('Vision par minute', num(g.visMin, 2), o ? num(o.visMin, 2) : '–', cmp(g.visMin, o && o.visMin)));
+  if (g.kp !== null) rows.push(row('Participation aux kills', `${Math.round(g.kp * 100)} %`, o && o.kp !== null ? `${Math.round(o.kp * 100)} %` : '–', cmp(g.kp, o && o.kp)));
+  if (g.dmg !== null) rows.push(row('Part des dégâts de l’équipe', `${Math.round(g.dmg * 100)} %`, o && o.dmg !== null ? `${Math.round(o.dmg * 100)} %` : '–', ''));
+  return h(
+    'div',
+    { class: 'pg-detail' },
+    g.goal ? h('div', { class: `pg-goal ${g.goal.ok ? 'ok' : 'ko'}` }, g.goal.ok ? '✓ Objectif atteint : ' : '✗ Objectif manqué : ', g.goal.label) : null,
+    h('table', { class: 'pg-table' }, h('tr', null, h('th', null, ''), h('th', null, 'Toi'), h('th', null, g.oppChamp ? g.oppChamp.name : 'Adversaire direct')), rows),
+    h(
+      'div',
+      { class: 'pg-extra' },
+      g.deaths && g.deaths.length ? h('div', null, h('span', { class: 't' }, 'Tes morts (à revoir dans le replay)'), g.deaths.map((m) => h('span', { class: `chip ghost ${m < 10 ? 'early' : ''}` }, mmss(m)))) : g.deaths ? h('div', null, h('span', { class: 't' }, 'Aucune mort')) : null,
+      g.firstItem ? h('div', null, h('span', { class: 't' }, '1er objet'), ico(g.firstItem.icon, g.firstItem.name), h('span', null, `${g.firstItem.name} à ${g.firstItem.minute} min`)) : null,
+      h('div', null, h('span', { class: 't' }, 'Balises'), h('span', null, `${g.wards} posées · ${g.cw} balise${g.cw > 1 ? 's' : ''} de contrôle achetée${g.cw > 1 ? 's' : ''}`)),
+    ),
+  );
+}
+
+function renderProgress(s, force = false) {
+  const box = $('#progressView');
+  if (!box || ($('#page-live').hidden && !force)) return;
+  const p = s.progress;
+  const key = JSON.stringify([p, gameOpen, gameOpenAuto]);
+  if (key === lastProgressKey && !force) return;
+  lastProgressKey = key;
+  if (!p) return box.replaceChildren();
+
+  const head = h(
+    'div',
+    { class: 'lv-t' },
+    h('h3', null, 'Ta progression'),
+    h('span', { class: 'meta' }, [p.riotId, p.syncing ? 'mise à jour…' : p.waiting ? 'bilan de ta dernière partie en cours de récupération…' : null].filter(Boolean).join(' · ')),
+  );
+  if (!p.total) {
+    const why = !p.hasKey
+      ? 'Ajoute ta clé API Riot (Réglages) : BuildSense récupère alors tes dernières parties pour ton bilan et ton objectif.'
+      : !p.riotId
+        ? 'Ouvre le client League of Legends : BuildSense y lit ton Riot ID, puis récupère tes 20 dernières parties.'
+        : p.error || (p.syncing ? 'Récupération de tes dernières parties…' : 'Aucune partie récente trouvée sur ce compte.');
+    box.replaceChildren(h('div', { class: 'card lv-card' }, head, h('p', { class: 'muted' }, why), p.hasKey && p.riotId ? h('div', { class: 'btns' }, h('button', { class: 'btn ghost small', onclick: syncProgress }, 'Actualiser')) : null));
+    return;
+  }
+
+  // objectif de session
+  const g = p.goal;
+  const goalBox = h(
+    'div',
+    { class: 'pg-goalbox' },
+    h('div', { class: 'pg-goalhead' }, h('span', { class: 't' }, 'Objectif de ta prochaine partie'), h('b', null, g.label), g.auto && g.why ? h('small', null, g.why) : null, g.recent ? h('small', null, `Objectif atteint ${g.ok} fois sur tes ${g.recent} dernières parties suivies.`) : null),
+    h(
+      'div',
+      { class: 'seg wrap' },
+      GOAL_CHOICES.filter(([v]) => !(v === 'cs10' && p.role === 'UTILITY')).map(([v, t]) =>
+        h('button', { class: g.choice === v ? 'active' : '', onclick: async () => { state = await api.invoke('goal:set', v); render(); } }, t),
+      ),
+    ),
+    h('p', { class: 'muted small' }, 'Il s’affiche dans l’overlay pendant la partie (Faille), avec ton avancement en direct.'),
+  );
+
+  // tendances
+  const filter = h(
+    'div',
+    { class: 'seg wrap' },
+    h('button', { class: p.champKey ? '' : 'active', onclick: async () => { state = await api.invoke('progress:filter', 0); render(); } }, `Tout (${ROLE_LABEL[p.role] || 'poste'})`),
+    p.champs.map((c) => h('button', { class: p.champKey === c.key ? 'active' : '', onclick: async () => { state = await api.invoke('progress:filter', c.key); render(); } }, `${c.name} (${c.n})`)),
+  );
+  const trendsEl = p.trends.length
+    ? h(
+        'table',
+        { class: 'pg-trends' },
+        h('tr', null, h('th', null, `${p.n} dernières parties`), h('th', null, 'Toi'), h('th', { title: 'Moyenne de tes adversaires directs : même poste, même niveau' }, 'Tes adversaires'), h('th', null, 'Évolution'), h('th', null, '')),
+        p.trends.map((t) => {
+          const behind = t.gap !== null && t.gap >= 0.08;
+          const aheadOf = t.gap !== null && t.gap <= -0.05;
+          return h(
+            'tr',
+            { class: p.weakness && p.weakness.id === t.id ? 'weak' : '' },
+            h('td', null, t.label, p.weakness && p.weakness.id === t.id ? h('span', { class: 'tag warn' }, 'point faible') : null),
+            h('td', { class: `me ${behind ? 'bad' : aheadOf ? 'good' : ''}` }, fmtMetric(t, t.mine)),
+            h('td', null, t.id === 'gd15' ? '–' : fmtMetric(t, t.bench)),
+            h('td', { class: t.trend > 0 ? 'good' : t.trend < 0 ? 'bad' : 'muted' }, t.trend > 0 ? '↗ en progrès' : t.trend < 0 ? '↘ en recul' : '→ stable'),
+            h('td', null, t.series.length >= 4 ? sparkline(t.series, t.trend > 0 ? 'good' : t.trend < 0 ? 'bad' : '') : null),
+          );
+        }),
+      )
+    : h('p', { class: 'muted small' }, 'Pas encore assez de parties classées ou normales sur la Faille pour dégager des tendances (3 minimum).');
+
+  // parties récentes
+  const open = gameOpenAuto && gameOpen === null && p.games.length ? p.games[0].id : gameOpen;
+  const gamesEl = h(
+    'div',
+    { class: 'pg-games' },
+    p.games.map((gm) =>
+      h(
+        'div',
+        { class: `pg-game ${gm.w ? 'win' : 'loss'} ${open === gm.id ? 'open' : ''}` },
+        h(
+          'div',
+          { class: 'pg-row', role: 'button', tabindex: '0', onclick: () => { gameOpen = open === gm.id ? '' : gm.id; gameOpenAuto = false; renderProgress(state, true); } },
+          gm.champ ? ico(gm.champ.icon, gm.champ.name) : h('span'),
+          h('div', { class: 'pn' }, h('b', null, gm.champ ? gm.champ.name : '?', gm.oppChamp ? h('small', null, ` vs ${gm.oppChamp.name}`) : null), h('small', null, `${gm.w ? 'Victoire' : 'Défaite'} · ${gm.queueLabel}${gm.r ? ` · ${ROLE_LABEL[gm.r]}` : ''} · ${gm.d} min · ${new Date(gm.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`)),
+          h('span', { class: 'kda' }, `${gm.k} / ${gm.de} / ${gm.a}`),
+          h('span', { class: 'mini' }, gm.cs10 !== null && gm.r !== 'UTILITY' && gm.comparable ? `${gm.cs10} CS à 10` : `${String(gm.csMin).replace('.', ',')} CS/min`),
+          gm.goal ? h('span', { class: `tag ${gm.goal.ok ? 'okk' : 'warn'}` }, gm.goal.ok ? '✓ objectif' : '✗ objectif') : h('span'),
+        ),
+        open === gm.id ? gameDetail(gm) : null,
+      ),
+    ),
+  );
+
+  box.replaceChildren(
+    h(
+      'div',
+      { class: 'card lv-card pg-card' },
+      head,
+      goalBox,
+      h('h4', null, 'Tes tendances'),
+      filter,
+      trendsEl,
+      h('h4', null, 'Tes dernières parties'),
+      h('p', { class: 'muted small' }, 'Clique sur une partie pour son bilan complet, face à ton adversaire direct.'),
+      gamesEl,
+      h('div', { class: 'btns' }, h('button', { class: 'btn ghost small', disabled: p.syncing ? '' : null, onclick: syncProgress }, p.syncing ? 'Mise à jour…' : 'Actualiser'), p.error ? h('span', { class: 'msg warn' }, p.error) : null),
+    ),
+  );
+}
+
+async function syncProgress() {
+  state = await api.invoke('progress:sync');
+  render();
 }
 
 async function start() {

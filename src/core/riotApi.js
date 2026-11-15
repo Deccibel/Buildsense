@@ -189,7 +189,9 @@ class RiotApi {
 
   matchIds(puuid, { count = 20, startTime = null, queue = 420, platform = null } = {}) {
     // pas de filtre "type" : la file suffit (ranked, normal ARAM, Arena...)
-    const q = new URLSearchParams({ queue: String(queue), start: '0', count: String(count) });
+    // queue = null : toutes les files (tes propres parties)
+    const q = new URLSearchParams({ start: '0', count: String(count) });
+    if (queue !== null && queue !== undefined) q.set('queue', String(queue));
     if (startTime) q.set('startTime', String(startTime));
     return this.request(`${this.regionalHost(platform)}/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?${q}`);
   }

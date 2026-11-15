@@ -155,3 +155,66 @@ test('Raccourcis en jeu : combinaisons lues par keywatch', () => {
   assert.equal(comboOf(''), null);
   assert.equal(comboOf('Shift+?'), null);
 });
+
+test('Tes parties : bilan complet depuis match + timeline', () => {
+  const mg = require('../src/core/myGames');
+  const m = JSON.parse(JSON.stringify(match));
+  m.info.participants.forEach((p, i) => Object.assign(p, { kills: i === 2 ? 6 : 2, deaths: i === 2 ? 3 : 4, assists: 5, totalMinionsKilled: 180, neutralMinionsKilled: 8, visionScore: 20, wardsPlaced: 9, visionWardsBoughtInGame: 2, totalDamageDealtToChampions: 15000 }));
+  const frame = (min) => ({
+    timestamp: min * 60000,
+    participantFrames: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i + 1), { minionsKilled: (i === 2 ? 7 : 6) * min, jungleMinionsKilled: 0, totalGold: (i === 2 ? 420 : 400) * min, xp: 400 * min }])),
+    events: min === 4 ? [{ type: 'CHAMPION_KILL', victimId: 3, timestamp: 4.5 * 60000 }] : min === 12 ? [{ type: 'CHAMPION_KILL', victimId: 3, timestamp: 12 * 60000 }, { type: 'CHAMPION_KILL', victimId: 8, timestamp: 12.2 * 60000 }] : [],
+  });
+  const tl = { info: { frames: Array.from({ length: 20 }, (_, i) => frame(i)) } };
+  const g = mg.analyzeMatch(m, tl, 'puuid-3', dd);
+  assert.equal(g.r, 'MIDDLE');
+  assert.equal(g.cs10, 70);
+  assert.equal(g.opp.cs10, 60);
+  assert.equal(g.gd15, 300);
+  assert.deepEqual(g.deaths, [4.5, 12]);
+  assert.equal(g.d10, 1);
+  assert.equal(g.opp.d10, 0);
+  assert.equal(g.kp, round2(11 / 14));
+  assert.equal(mg.analyzeMatch(m, tl, 'inconnu', dd), null);
+  m.info.gameDuration = 200;
+  assert.equal(mg.analyzeMatch(m, tl, 'puuid-3', dd), null, 'remake ignoré');
+});
+function round2(x) {
+  return Math.round(x * 100) / 100;
+}
+
+test('Tes parties : tendances, point faible et objectif de session', () => {
+  const mg = require('../src/core/myGames');
+  const game = (i, over = {}) => ({ id: `G${i}`, at: 1000 - i, queue: 420, family: 'sr', c: 103, r: 'MIDDLE', w: i % 2, d: 30, k: 5, de: 5, a: 5, cs: 180, csMin: 6, cs10: 50, d10: 1, visMin: 0.6, kp: 0.5, gd15: -100, opp: { csMin: 7, cs10: 68, d10: 1, de: 5, visMin: 0.6, kp: 0.5 }, ...over });
+  const store = new mg.MyGames(null);
+  assert.equal(store.add(Array.from({ length: 12 }, (_, i) => game(i))), 12);
+  assert.equal(store.add([game(0)]), 0, 'pas de doublon');
+  store.add([{ ...game(99), queue: 450, r: '' }]);
+  assert.equal(store.comparable().length, 12, 'ARAM hors tendances');
+  assert.equal(store.mainRole(), 'MIDDLE');
+  const tr = mg.trends(store.comparable({ role: 'MIDDLE' }), 'MIDDLE');
+  const cs10 = tr.find((t) => t.id === 'cs10');
+  assert.equal(cs10.mine, 50);
+  assert.equal(cs10.bench, 68);
+  assert.equal(mg.weakness(tr).id, 'cs10');
+  const goal = mg.pickGoal('auto', tr, 'MIDDLE');
+  assert.equal(goal.id, 'cs10');
+  assert.equal(goal.target, 59, 'à mi-chemin entre ta moyenne et tes adversaires');
+  assert.equal(mg.pickGoal('deaths', tr, 'MIDDLE').target, 4);
+  assert.equal(mg.pickGoal('cs10', [], 'UTILITY').id, 'vision', 'support : pas d’objectif de farm');
+  assert.equal(mg.pickGoal('auto', [], 'TOP').target, 62, 'sans historique : repère du poste');
+  // suivi en direct
+  const live = (o) => ({ time: 300, cs: 20, deaths: 0, kills: 0, assists: 0, teamKills: 0, vision: 0, cs10: null, d10: 0, ...o });
+  assert.equal(mg.liveGoal(goal, live({ cs: 30 })).state, 'ahead');
+  assert.equal(mg.liveGoal(goal, live({ cs: 10 })).state, 'behind');
+  assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: 61 })).state, 'done');
+  assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: 40 })).state, 'failed');
+  assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: null })).state, 'wait', 'BuildSense lancé après 10 min');
+  const early = mg.pickGoal('early', tr, 'MIDDLE');
+  assert.equal(mg.liveGoal(early, live({ deaths: 1, d10: 1 })).state, 'failed');
+  assert.equal(mg.liveGoal(early, live({ time: 900, deaths: 3, d10: 0 })).state, 'done');
+  // résultat sur la partie terminée
+  assert.equal(mg.goalResult(goal, game(1, { cs10: 60 })).ok, true);
+  assert.equal(mg.goalResult(goal, game(1, { cs10: 58 })).ok, false);
+  assert.equal(mg.goalResult(goal, game(1, { cs10: null })), null);
+});
