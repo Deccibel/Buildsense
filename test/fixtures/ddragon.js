@@ -20,6 +20,8 @@ function item(name, o) {
     maps: o.maps || { 11: true, 12: true },
     image: { full: 'x.png' },
     ...(o.consumed ? { consumed: true } : {}),
+    ...(o.specialRecipe ? { specialRecipe: o.specialRecipe } : {}),
+    ...(o.inStore === false ? { inStore: false } : {}),
   };
 }
 
@@ -87,6 +89,12 @@ const items = {
   224645: item('Shadowflame (Arena)', { base: 3200, total: 3200, maps: { 11: false, 12: false, 30: true }, stats: [[110, 'Ability Power'], [15, 'Magic Penetration']] }),
   // objet de départ des supports (quête : s'améliore tout seul)
   3865: item('World Atlas', { base: 400, total: 400, tags: ['GoldPer', 'Lane'], into: [] }),
+  // étapes de la quête (transformations) puis évolutions au choix, gratuites
+  3866: item('Runic Compass', { base: 400, total: 400, tags: ['GoldPer', 'Lane'], purchasable: false, inStore: false, specialRecipe: 3865 }),
+  3867: item('Bounty of Worlds', { base: 400, total: 400, tags: ['GoldPer', 'Lane'], purchasable: false, inStore: false, specialRecipe: 3866, into: [3869, 3870, 3877] }),
+  3869: item('Celestial Opposition', { base: 0, total: 400, from: [3867], tags: ['GoldPer', 'Lane'], stats: [[200, 'Health']], extra: '<passive>Blessing of the Mountain</passive><br>Reduces damage taken from champions for 2 seconds after taking damage from a champion.<br><br><active>Active</active> Places a Stealth Ward.' }),
+  3870: item('Dream Maker', { base: 0, total: 400, from: [3867], tags: ['GoldPer', 'Lane'], stats: [[200, 'Health']], extra: '<passive>Dream Maker</passive><br>Healing or shielding an ally sends them bubbles: their next attack deals bonus magic damage , and the next damage they take is reduced.<br><br><active>Active</active> Places a Stealth Ward.' }),
+  3877: item('Bloodsong', { base: 0, total: 400, from: [3867], tags: ['GoldPer', 'Lane'], stats: [[200, 'Health']], extra: '<passive>Spellblade</passive><br>After using an Ability, your next attack deals bonus physical damage.<br><br><active>Active</active> Places a Stealth Ward.' }),
   // objet de la Faille désactivé en ARAM
   2065: item("Shurelya's Battlesong", { base: 2200, total: 2200, maps: { 11: true, 12: false }, stats: [[55, 'Ability Power'], [200, 'Health'], ['5%', 'Heal and Shield Power']] }),
 };

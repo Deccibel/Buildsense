@@ -61,6 +61,26 @@ function ddLanguage(locale) {
 }
 
 /**
+ * Objet de support : objet de départ -> étapes de la quête -> évolutions au choix (gratuites).
+ * Déduit de Data Dragon : les étapes se suivent par "specialRecipe", la dernière propose les évolutions.
+ * @returns {{ start:number, stages:number[], last:number, upgrades:number[], all:Set<number> } | null}
+ */
+function supportTree(items) {
+  const next = new Map(); // étape -> étape suivante
+  for (const it of items.values()) if (it.specialRecipe && items.has(it.specialRecipe)) next.set(it.specialRecipe, it.id);
+  for (const root of next.keys()) {
+    const start = items.get(root);
+    if (start.specialRecipe || !start.tags.includes('GoldPer')) continue; // pas le début de la quête
+    const stages = [root];
+    while (next.has(stages[stages.length - 1]) && stages.length < 6) stages.push(next.get(stages[stages.length - 1]));
+    const last = items.get(stages[stages.length - 1]);
+    const upgrades = last.into.filter((id) => items.has(id) && items.get(id).from.includes(last.id));
+    if (upgrades.length >= 2) return { start: root, stages, last: last.id, upgrades, all: new Set([...stages, ...upgrades]) };
+  }
+  return null;
+}
+
+/**
  * Données statiques du jeu (objets, champions, runes, sorts) via Data Dragon,
  * avec cache disque pour fonctionner hors ligne.
  */
@@ -180,6 +200,7 @@ class DDragon {
       }
     }
     for (const it of this.items.values()) it.isLegendary = it.legendaryOn.has(11);
+    this.support = supportTree(this.items);
 
     this.champions = new Map();
     this.championsById = new Map();
@@ -261,6 +282,23 @@ class DDragon {
     return names[id] || `${String(this.language).startsWith('fr') ? 'Fragment' : 'Shard'} ${id}`;
   }
 
+  /** Objet de la quête de support (départ, étapes ou évolution). */
+  isSupportItem(id) {
+    return !!this.support && this.support.all.has(Number(id));
+  }
+
+  /**
+   * Où en est la quête : 'quest' (en cours), 'choose' (terminée : évolution à choisir dans la boutique),
+   * 'done' (évolution choisie), ou null si ce n'est pas un objet de support.
+   */
+  supportStage(id) {
+    const s = this.support;
+    const n = Number(id);
+    if (!s || !s.all.has(n)) return null;
+    if (s.upgrades.includes(n)) return 'done';
+    return n === s.last ? 'choose' : 'quest';
+  }
+
   /** Objet complété sur cette carte (11 Faille, 12 ARAM, 30 Arena). */
   isLegendary(id, map = 11) {
     const it = this.items.get(Number(id));
@@ -309,6 +347,7 @@ class DDragon {
     for (const it of this.items.values()) {
       if (maps.some((m) => it.maps.includes(m)) && (it.purchasable || it.legendaryOn.size)) out.add(this.itemIconPath(it.id));
     }
+    if (this.support) for (const id of this.support.all) out.add(this.itemIconPath(id));
     for (const s of this.spells.values()) out.add(this.spellIconPath(s));
     for (const st of this.styles.values()) if (st.icon) out.add(this.runeIconPath(st));
     for (const r of this.runes.values()) if (r.icon) out.add(this.runeIconPath(r));
@@ -342,4 +381,4 @@ class DDragon {
   }
 }
 
-module.exports = { DDragon, SHARDS, SHARD_ICONS, BASE, DD_LANGUAGES, ddLanguage };
+module.exports = { DDragon, SHARDS, SHARD_ICONS, BASE, DD_LANGUAGES, ddLanguage, supportTree };

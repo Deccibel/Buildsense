@@ -48,6 +48,7 @@ function makeData({ lang = 'fr', extreme = false } = {}) {
     ...R.roleRecords(),
     ...R.supportRecords(),
     ...R.ahriSupportRecords(4),
+    ...R.threshSupportRecords(),
     ...R.ahriRecords(25, 99).map((r) => ({ ...r, m: `F_${r.m}`, fp: 'f1' })),
     ...R.metaRecords(),
   ]);
@@ -74,6 +75,15 @@ function overlayVms({ dd, store, rec }) {
   };
   const cs = (session, queue, extra = {}) =>
     computeChampSelect({ dd, store, rec, cs: parseChampSelect(clone(session), dd, queue), hasKey, importHotkey, ...extra });
+  // la partie de démo vue par le support de l'équipe (Thresh)
+  const supportGame = (items) => {
+    const g = readJson('demo', 'allgamedata.json');
+    const me = g.allPlayers.find((p) => p.position === 'UTILITY' && p.team === 'ORDER');
+    Object.assign(g.activePlayer, { riotId: me.riotId, riotIdGameName: me.riotIdGameName, riotIdTagLine: me.riotIdTagLine, summonerName: me.summonerName, currentGold: 640 });
+    me.items = items.map((itemID) => ({ itemID }));
+    me.scores = { ...me.scores, creepScore: 18, wardScore: 31 };
+    return g;
+  };
   const demoCs = readJson('demo', 'champselect.json');
   const aramCs = readJson('test', 'fixtures', 'champselect-aram.json');
   const offRole = { override: { champKey: R.K.Ahri, role: 'UTILITY' }, prefs: {} };
@@ -93,6 +103,9 @@ function overlayVms({ dd, store, rec }) {
       return live(g);
     })(),
     'partie-hors-poste': live('demo/allgamedata.json', {}, { roleChoice: offRole }),
+    // support : objet de support à prévoir (quête en cours), puis à choisir (quête terminée)
+    'partie-support': live(supportGame([3866, 3047])),
+    'partie-support-choix': live(supportGame([3867, 3047, 3143])),
     'partie-aram': live('demo/allgamedata-aram.json'),
     'partie-mayhem': live('demo/allgamedata-aram.json', { gameMode: 'KIWI' }),
     'partie-arena': live('test/fixtures/allgamedata-arena.json'),
@@ -111,8 +124,19 @@ function overlayVms({ dd, store, rec }) {
     }),
     'selection-hors-poste': decorate(cs(demoCs, RANKED, { roleChoice: offRole }), {
       state: 'kept',
-      text: 'Tu as modifié ta page : BuildSense n’y touche plus',
+      text: 'Tu as modifié ta page : Stonks n’y touche plus',
     }),
+    'selection-support': decorate(
+      cs(
+        (() => {
+          const c = clone(demoCs);
+          c.localPlayerCellId = 4;
+          c.myTeam[4].championId = R.K.Thresh;
+          return c;
+        })(),
+        RANKED,
+      ),
+    ),
     'selection-aram': decorate(cs(aramCs, { id: 450, mapId: 12, gameMode: 'ARAM' })),
     'selection-mayhem': decorate(cs(aramCs, { id: 2400, mapId: 12, gameMode: 'KIWI' })),
     'message-swarm': (() => {
@@ -130,7 +154,7 @@ function overlaySettings(extra = {}) {
 
 /** État de la fenêtre principale (même forme que fullState() dans main.js). */
 const UPDATE_NOTES = [
-  'Mises à jour automatiques : BuildSense détecte les nouvelles versions, les télécharge en fond (jamais pendant une partie) et s’installe en un clic.',
+  'Mises à jour automatiques : Stonks détecte les nouvelles versions, les télécharge en fond (jamais pendant une partie) et s’installe en un clic.',
   'Une carte « Quoi de neuf » s’affiche après chaque mise à jour.',
 ];
 

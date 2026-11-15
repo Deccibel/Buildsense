@@ -34,6 +34,8 @@ const ITEMS_FR = {
   3143: 'Présage de Randuin', 3075: 'Cotte épineuse', 3065: 'Visage spirituel', 3004: 'Manamune', 3042: 'Muramana',
   223031: "Lame d'infini (Arena)", 223157: 'Sablier de Zhonya (Arena)', 223089: 'Coiffe de Rabadon (Arena)',
   226655: 'Compagnon de Luden (Arena)', 224645: 'Flamme-ombre (Arena)', 2065: 'Hymne guerrier de Shurelya',
+  3865: 'Atlas', 3866: 'Boussole runique', 3867: 'Trésor des mondes', 3869: 'Opposition céleste', 3870: 'Rêve éveillé',
+  3877: 'Mélodie du sang',
 };
 
 const RUNES_FR = {

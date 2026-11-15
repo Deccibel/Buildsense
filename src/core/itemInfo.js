@@ -115,6 +115,14 @@ function detectFlags(textEn, stats) {
   };
 }
 
+/** Premier effet passif d'une description Data Dragon : { name, text }, dans la langue d'affichage. */
+function passiveOf(desc) {
+  const m = /<passive>([^<]+)<\/passive>(?:\s*<br>)?([\s\S]*?)(?=<br>\s*<br>|<\/mainText>|$)/i.exec(String(desc || ''));
+  if (!m) return null;
+  const text = stripTags(m[2]).replace(/\s+/g, ' ').replace(/\s+([,.])/g, '$1').trim();
+  return text ? { name: m[1].trim(), text } : null;
+}
+
 /**
  * @param {number} id
  * @param {object} it  objet dans la langue d'affichage
@@ -166,7 +174,10 @@ function classifyItem(id, it, en) {
     flags: detectFlags(textEn, stats),
     cls: itemClass(stats),
     group: group ? group.trim().toLowerCase() : null,
+    // objet obtenu par transformation d'un autre (quête de l'objet de support : Atlas -> Boussole -> Trésor)
+    specialRecipe: Number(it.specialRecipe || en.specialRecipe) || 0,
+    passive: passiveOf(it.description),
   };
 }
 
-module.exports = { classifyItem, parseStats, stripTags, itemClass };
+module.exports = { classifyItem, parseStats, stripTags, itemClass, passiveOf };

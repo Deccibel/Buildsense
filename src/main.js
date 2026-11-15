@@ -30,7 +30,7 @@ const OVERLAY_WIDTH = 340;
 const ROOT = path.join(__dirname, '..');
 const PKG = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 // tests de bout en bout : mise à jour simulée (rien n'est lancé)
-const UPDATE_DRYRUN = process.env.BUILDSENSE_UPDATE_DRYRUN === '1';
+const UPDATE_DRYRUN = process.env.STONKS_UPDATE_DRYRUN === '1';
 const UPDATE_CHECK_EVERY = 4 * 3600 * 1000;
 const LINKS = {
   portal: 'https://developer.riotgames.com/',
@@ -85,8 +85,12 @@ protocol.registerSchemesAsPrivileged([
 
 // ---------------------------------------------------------------- démarrage
 
-// développement : dossier de données séparé (une version installée peut tourner en même temps)
-if (process.env.BUILDSENSE_USERDATA) app.setPath('userData', process.env.BUILDSENSE_USERDATA);
+// Dossier des données. Développement : dossier séparé (une version installée peut tourner en même temps).
+// Sinon, l'ancien dossier « BuildSense » est gardé tel quel s'il existe : mêmes réglages et mêmes données
+// qu'avant le changement de nom (et que la version stable), sans rien déplacer. Nouvelle installation : « Stonks ».
+const LEGACY_USERDATA = path.join(app.getPath('appData'), 'BuildSense');
+if (process.env.STONKS_USERDATA) app.setPath('userData', process.env.STONKS_USERDATA);
+else if (fs.existsSync(path.join(LEGACY_USERDATA, 'config.json'))) app.setPath('userData', LEGACY_USERDATA);
 const T0 = Date.now();
 
 const gotLock = app.requestSingleInstanceLock();
@@ -106,7 +110,7 @@ if (!gotLock) {
 }
 
 async function init() {
-  if (process.platform === 'win32') app.setAppUserModelId('BuildSense');
+  if (process.platform === 'win32') app.setAppUserModelId('Stonks');
   const userData = app.getPath('userData');
   S.config = new Config(userData);
   S.dd = new DDragon({ cacheDir: path.join(userData, 'cache'), language: effectiveLanguage() });
@@ -149,6 +153,8 @@ async function init() {
     S.lastGame = null;
   }
   nativeTheme.themeSource = THEMES[S.config.get('appearance').theme] || 'dark';
+  // thème automatique : Windows passe en clair ou en sombre pendant que l'appli tourne
+  nativeTheme.on('updated', applyWindowChrome);
 
   createMainWindow();
   createOverlay();
@@ -178,7 +184,7 @@ const REPO_RE = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 
 /** Dépôt GitHub des versions : réglage de l'utilisateur, sinon celui de package.json. */
 function updateRepo() {
-  const r = S.config.get('updateRepo') || (PKG.buildsense && PKG.buildsense.repo) || '';
+  const r = S.config.get('updateRepo') || (PKG.stonks && PKG.stonks.repo) || '';
   return REPO_RE.test(r) ? r : '';
 }
 
@@ -204,7 +210,7 @@ function extraFeeds() {
 
 /** Nom affiché de la version : "PG-AAAAMMJJ-bN" pour une bêta, sinon le numéro. */
 function versionLabel() {
-  const b = PKG.buildsense || {};
+  const b = PKG.stonks || {};
   return b.channel === 'beta' && b.betaName ? `${b.betaName} (${PKG.version})` : PKG.version;
 }
 
@@ -229,7 +235,7 @@ function setupUpdater(userData) {
     if (st.status !== trayStatus) {
       trayStatus = st.status;
       buildTrayMenu();
-      if (st.status === 'ready') toast(`BuildSense ${st.latest} est prête : redémarre pour l'installer.`, 'ok');
+      if (st.status === 'ready') toast(`Stonks ${st.latest} est prête : redémarre pour l'installer.`, 'ok');
     }
     maybeAutoDownload();
   });
@@ -300,8 +306,8 @@ function installUpdate() {
 function setupIcons(userData) {
   S.icons = new IconCache({
     dir: path.join(userData, 'cache', 'icons'),
-    // BUILDSENSE_DDRAGON : serveur d'icônes de test (développement uniquement)
-    remoteBase: process.env.BUILDSENSE_DDRAGON || DEFAULT_REMOTE,
+    // STONKS_DDRAGON : serveur d'icônes de test (développement uniquement)
+    remoteBase: process.env.STONKS_DDRAGON || DEFAULT_REMOTE,
     fetchImpl: (url) => net.fetch(url),
   });
   S.dd.iconBase = 'bsicon://dd';
@@ -432,20 +438,23 @@ function startCrawlerIfPossible() {
 
 function createMainWindow() {
   S.mainWin = new BrowserWindow({
-    width: 980,
-    height: 760,
-    minWidth: 760,
+    width: 1100,
+    height: 780,
+    minWidth: 800,
     minHeight: 560,
-    title: 'BuildSense',
+    title: 'Stonks',
     icon: path.join(ROOT, 'assets', 'icon.png'),
     backgroundColor: windowBackground(),
     autoHideMenuBar: true,
+    // pas de barre de titre : le contenu monte jusqu'en haut, Windows ne dessine que ses trois boutons
+    titleBarStyle: 'hidden',
+    titleBarOverlay: titleBarOverlay(),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  S.mainWin.loadFile(path.join(__dirname, 'ui', 'dashboard.html'));
+  S.mainWin.loadFile(path.join(__dirname, 'ui', 'dashboard.html'), { query: { accent: S.config.get('appearance').accent } });
   S.mainWin.webContents.once('did-finish-load', () => {
-    if (process.env.BUILDSENSE_TIMING) console.log(`[timing] fenêtre affichée en ${Date.now() - T0} ms`);
-    if (process.env.BUILDSENSE_SHOTS) devShots(process.env.BUILDSENSE_SHOTS);
+    if (process.env.STONKS_TIMING) console.log(`[timing] fenêtre affichée en ${Date.now() - T0} ms`);
+    if (process.env.STONKS_SHOTS) devShots(process.env.STONKS_SHOTS);
   });
   S.mainWin.on('show', () => {
     if (S.stateDirty) pushState(true);
@@ -458,7 +467,7 @@ function createMainWindow() {
   });
 }
 
-/** Développement : captures des pages principales (BUILDSENSE_SHOTS=dossier). */
+/** Développement : captures des pages principales (STONKS_SHOTS=dossier). */
 async function devShots(dir) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   fs.mkdirSync(dir, { recursive: true });
@@ -470,7 +479,7 @@ async function devShots(dir) {
   const js = (code) => w.webContents.executeJavaScript(code);
   await wait(4000);
   while (!S.store.loaded) await wait(300);
-  if (process.env.BUILDSENSE_TIMING) console.log(`[timing] données chargées en ${Date.now() - T0} ms`);
+  if (process.env.STONKS_TIMING) console.log(`[timing] données chargées en ${Date.now() - T0} ms`);
   await shot('home');
   setDemo('ingame');
   await wait(800);
@@ -575,7 +584,7 @@ function createOverlay() {
     hasShadow: false,
     show: false,
     backgroundColor: '#00000000',
-    title: 'BuildSense overlay',
+    title: 'Stonks overlay',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -587,7 +596,7 @@ function createOverlay() {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setIgnoreMouseEvents(true);
   if (win.setVisibleOnAllWorkspaces) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  win.loadFile(path.join(__dirname, 'ui', 'overlay.html'));
+  win.loadFile(path.join(__dirname, 'ui', 'overlay.html'), { query: { accent: S.config.get('appearance').accent } });
   win.webContents.on('did-finish-load', () => {
     win.webContents.setZoomFactor(overlayScale());
     pushOverlaySettings();
@@ -619,7 +628,7 @@ function overlayOnTopTick() {
 function createTray() {
   const img = nativeImage.createFromPath(path.join(ROOT, 'assets', 'tray.png'));
   S.tray = new Tray(img);
-  S.tray.setToolTip(`BuildSense ${versionLabel()}`);
+  S.tray.setToolTip(`Stonks ${versionLabel()}`);
   buildTrayMenu();
   S.tray.on('click', showMain);
 }
@@ -629,7 +638,7 @@ function buildTrayMenu() {
   const hk = S.config.get('hotkeys');
   const u = S.updater ? S.updater.status() : null;
   const items = [
-    { label: 'Ouvrir BuildSense', click: showMain },
+    { label: 'Ouvrir Stonks', click: showMain },
     { label: `Afficher / masquer l'overlay (${hotkeyLabel(hk.toggle)})`, click: toggleHidden },
     { label: `Déplacer l'overlay (${hotkeyLabel(hk.move)})`, click: () => setMoveMode(!S.moveMode) },
   ];
@@ -657,21 +666,36 @@ function pushOverlaySettings() {
 }
 
 const THEMES = { auto: 'system', light: 'light', dark: 'dark' };
-const ACCENTS = ['cyan', 'red', 'green', 'yellow', 'orange', 'purple', 'blue', 'classic'];
+const ACCENTS = ['stonks', 'cyan', 'red', 'green', 'yellow', 'orange', 'purple', 'blue', 'classic'];
 
 /** Thème : Electron applique clair/sombre à toutes les fenêtres (prefers-color-scheme). */
 function applyAppearance() {
   const a = S.config.get('appearance');
   nativeTheme.themeSource = THEMES[a.theme] || 'dark';
-  if (S.mainWin) S.mainWin.setBackgroundColor(windowBackground());
+  applyWindowChrome();
   pushOverlaySettings();
 }
 
+/** Fond de la fenêtre et couleur des boutons de fenêtre : ils suivent le thème (clair / sombre). */
+function applyWindowChrome() {
+  const w = S.mainWin;
+  if (!w || w.isDestroyed()) return;
+  w.setBackgroundColor(windowBackground());
+  if (process.platform === 'win32' && w.setTitleBarOverlay) w.setTitleBarOverlay(titleBarOverlay());
+}
+
+/** Couleur de fond de la fenêtre avant que la page s'affiche (la même que --bg dans dashboard.css). */
 function windowBackground() {
   const a = S.config.get('appearance');
   const light = nativeTheme.shouldUseDarkColors === false;
-  if (a.accent === 'classic') return light ? '#efe6d3' : '#010a13';
-  return light ? '#f3f5f9' : '#0a0d14';
+  if (a.accent === 'classic') return light ? '#efe6d3' : '#020a13';
+  return light ? '#edf0f8' : '#070a14';
+}
+
+/** Boutons de fenêtre de Windows (réduire, agrandir, fermer) posés sur le contenu : fond transparent, symboles lisibles. */
+function titleBarOverlay() {
+  const light = nativeTheme.shouldUseDarkColors === false;
+  return { color: '#00000000', symbolColor: light ? '#1b2433' : '#e9edf5', height: 40 };
 }
 
 function currentVm() {
@@ -922,7 +946,7 @@ function cycleRole() {
 /**
  * Runes automatiques : une fois le champion verrouillé (et stable 2 lectures de suite),
  * la page recommandée remplace la page active. Si tu modifies la page ensuite,
- * BuildSense n'y touche plus (sauf si tu changes de champion ou de poste).
+ * Stonks n'y touche plus (sauf si tu changes de champion ou de poste).
  */
 async function autoApplyRunes(cs, vm) {
   const A = S.autoRunes;
@@ -944,7 +968,7 @@ async function autoApplyRunes(cs, vm) {
       const curPerks = cur && Array.isArray(cur.selectedPerkIds) ? cur.selectedPerkIds.join(',') : '';
       if (cur && curPerks !== A.applied.perks) {
         A.key = key;
-        A.status = { state: 'kept', text: 'Tu as modifié ta page : BuildSense n’y touche plus' };
+        A.status = { state: 'kept', text: 'Tu as modifié ta page : Stonks n’y touche plus' };
         return;
       }
     }
@@ -978,9 +1002,10 @@ function itemSetOf(vm) {
     type: i === 0 ? `★ Meilleur départ · ${pct(st.share)} des parties` : `Autre départ · ${pct(st.share)}`,
     items: group(st.ids),
   }));
+  if (s.support && s.support.length) blocks.push({ type: 'Objet de support : à choisir en fin de quête', items: s.support.map((id) => ({ id, count: 1 })) });
   if (s.core.length) blocks.push({ type: 'Build conseillé', items: s.core.map((id) => ({ id, count: 1 })) });
   if (s.boots) blocks.push({ type: 'Bottes', items: [{ id: s.boots, count: 1 }] });
-  return { title: `BuildSense · ${vm.header.champion}${vm.header.role ? ` ${vm.header.role}` : ''}`, champKey: s.champKey, map: s.map, blocks };
+  return { title: `Stonks · ${vm.header.champion}${vm.header.role ? ` ${vm.header.role}` : ''}`, champKey: s.champKey, map: s.map, blocks };
 }
 
 /** Une fois le champion verrouillé (stable 2 lectures), écrit la page d'objets dans le client. */
@@ -1132,7 +1157,7 @@ async function ensureIdentity() {
 /** Récupère tes dernières parties (bilan complet), sans jamais tourner pendant une partie. */
 async function syncMyGames({ count = 20 } = {}) {
   if (S.syncing || !S.dd.ready || !S.config.get('apiKey') || S.live.inGame) {
-    if (process.env.BUILDSENSE_TIMING) console.log(`[parties] ignoré : syncing=${!!S.syncing} dd=${S.dd.ready} cle=${!!S.config.get('apiKey')} enPartie=${S.live.inGame}`);
+    if (process.env.STONKS_TIMING) console.log(`[parties] ignoré : syncing=${!!S.syncing} dd=${S.dd.ready} cle=${!!S.config.get('apiKey')} enPartie=${S.live.inGame}`);
     return;
   }
   S.syncing = true;
@@ -1173,7 +1198,7 @@ async function syncMyGames({ count = 20 } = {}) {
   } catch (e) {
     S.syncError = e.message || String(e);
   } finally {
-    if (process.env.BUILDSENSE_TIMING) console.log(`[parties] ${S.myGames.games.length} en base${S.syncError ? `, erreur : ${S.syncError}` : ''}`);
+    if (process.env.STONKS_TIMING) console.log(`[parties] ${S.myGames.games.length} en base${S.syncError ? `, erreur : ${S.syncError}` : ''}`);
     S.syncing = false;
     pushState();
   }
@@ -1393,7 +1418,7 @@ function setHotkey(name, accel) {
   }
   if (typeof accel !== 'string' || !ACCEL_RE.test(accel)) return 'Combinaison non prise en charge : utilise Ctrl, Alt, Maj ou Win + une lettre, un chiffre ou une touche F.';
   const dup = HOTKEY_NAMES.find((n) => n !== name && hk[n] === accel);
-  if (dup) return `${hotkeyLabel(accel)} est déjà utilisé par un autre raccourci de BuildSense.`;
+  if (dup) return `${hotkeyLabel(accel)} est déjà utilisé par un autre raccourci de Stonks.`;
   const prev = hk[name];
   S.config.set({ hotkeys: { [name]: accel } });
   registerHotkeys();
@@ -1507,7 +1532,7 @@ function fullState() {
     followed: (cfg.followed || []).map((f) => ({ ...f, found: S.followStatus ? S.followStatus[f.id] : undefined })),
     version: PKG.version,
     versionLabel: versionLabel(),
-    build: { channel: (PKG.buildsense && PKG.buildsense.channel) || 'stable', betaName: (PKG.buildsense && PKG.buildsense.betaName) || null },
+    build: { channel: (PKG.stonks && PKG.stonks.channel) || 'stable', betaName: (PKG.stonks && PKG.stonks.betaName) || null },
     update: S.updater
       ? {
           ...S.updater.status(),

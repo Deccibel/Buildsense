@@ -128,6 +128,8 @@ const CHECK_FN = `(() => {
       const a = texts[i];
       const b = texts[j];
       if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      // élément flottant (barre d'outils collante) : le contenu défile dessous, ce n'est pas un chevauchement
+      if (a.el.closest('[data-float]') !== b.el.closest('[data-float]')) continue;
       const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
       const iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
       if (ix > 2 && iy > 3) issues.push({ type: 'chevauchement', text: a.label + ' ⟷ ' + b.label, by: desc(a.el) + ' / ' + desc(b.el) });
@@ -220,14 +222,18 @@ ipcMain.handle('champions:list', () => dashChamps);
 let dashWin = null;
 async function dashboardWindow() {
   if (dashWin) return dashWin;
-  // fenêtre visible (sur l'affichage virtuel) : une fenêtre cachée n'est pas repeinte après un clic
+  // rendu hors écran : rien ne s'affiche sur le bureau, et la page est bien repeinte après un clic
+  // (une fenêtre simplement cachée ne l'est pas)
   dashWin = new BrowserWindow({
     width: 1180,
     height: 860,
-    show: true,
-    backgroundColor: '#0a0d14',
-    webPreferences: { preload: path.join(ROOT, 'src', 'preload.js'), contextIsolation: true, sandbox: true },
+    useContentSize: true,
+    show: false,
+    frame: false,
+    backgroundColor: '#070a14',
+    webPreferences: { preload: path.join(ROOT, 'src', 'preload.js'), contextIsolation: true, sandbox: true, offscreen: true },
   });
+  dashWin.webContents.setFrameRate(30);
   windows.push(dashWin);
   return dashWin;
 }
@@ -317,6 +323,7 @@ async function selfTest() {
 }
 
 const APPEARANCES = [
+  ['light', 'stonks'],
   ['light', 'cyan'],
   ['dark', 'classic'],
   ['light', 'classic'],

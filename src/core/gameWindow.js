@@ -8,7 +8,7 @@
  *  - en Sans bordure : toujours ;
  *  - en Plein écran : grâce aux "optimisations plein écran" de Windows 10/11, qui font composer le jeu
  *    par le bureau (comme la Game Bar). Si elles sont désactivées pour LoL, le plein écran devient
- *    exclusif et aucune fenêtre ne peut passer devant : BuildSense le détecte et propose de corriger.
+ *    exclusif et aucune fenêtre ne peut passer devant : Stonks le détecte et propose de corriger.
  *
  * Fichiers lus : <dossier LoL>/Config/game.cfg et PersistedSettings.json (le client réécrit game.cfg
  * à partir de ce dernier au lancement d'une partie : les deux sont mis à jour ensemble).
@@ -115,13 +115,16 @@ function readWindowMode(leaguePath) {
   }
 }
 
+/** Une sauvegarde du fichier d'origine existe déjà (y compris sous l'ancien nom de l'appli). */
+const hasBackup = (file) => fs.existsSync(`${file}.stonks.bak`) || fs.existsSync(`${file}.buildsense.bak`);
+
 /** Passe le jeu en Sans bordure (pris en compte au prochain lancement d'une partie). */
 function setWindowMode(leaguePath, mode = 2) {
   const { gameCfg, persisted } = cfgPaths(leaguePath);
   let touched = 0;
   try {
     const text = fs.readFileSync(gameCfg, 'utf8');
-    if (!fs.existsSync(`${gameCfg}.buildsense.bak`)) fs.writeFileSync(`${gameCfg}.buildsense.bak`, text);
+    if (!hasBackup(gameCfg)) fs.writeFileSync(`${gameCfg}.stonks.bak`, text);
     fs.writeFileSync(gameCfg, withWindowMode(text, mode));
     touched++;
   } catch {
@@ -131,7 +134,7 @@ function setWindowMode(leaguePath, mode = 2) {
     const raw = fs.readFileSync(persisted, 'utf8');
     const j = JSON.parse(raw);
     if (patchPersisted(j, mode)) {
-      if (!fs.existsSync(`${persisted}.buildsense.bak`)) fs.writeFileSync(`${persisted}.buildsense.bak`, raw);
+      if (!hasBackup(persisted)) fs.writeFileSync(`${persisted}.stonks.bak`, raw);
       fs.writeFileSync(persisted, JSON.stringify(j, null, 4));
       touched++;
     }

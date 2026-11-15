@@ -6,15 +6,20 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; img-src 'self' bsicon: data:; style-src 'self'; script-src 'self'"
     />
-    <title>BuildSense</title>
+    <title>Stonks</title>
+    <script src="boot.js"></script>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="mascot.css" />
     <link rel="stylesheet" href="dashboard.css" />
   </head>
   <body>
+    <div class="dragbar"></div>
+    <div class="edge" data-float></div>
     <aside class="side">
       <div class="brand">
-        <img src="../../assets/icon.png" alt="" />
+        <span id="mascot"></span>
         <div>
-          <b>BuildSense</b>
+          <b>Stonks</b>
           <span id="version">builds des meilleurs joueurs</span>
         </div>
       </div>
@@ -128,7 +133,7 @@
           <h1>Builds</h1>
           <p>Choisis un mode, un champion et un poste. Clique sur un build pour voir qui le joue et pourquoi chaque objet est choisi. Mets-le en favori : il devient ton point de départ en partie (Faille).</p>
         </header>
-        <div class="toolbar">
+        <div class="toolbar" data-float>
           <div class="seg" id="bMode"></div>
           <select id="bChamp" class="search"></select>
           <div class="seg" id="bRole"></div>
@@ -153,7 +158,7 @@
           <h1>Meta</h1>
           <p>Les 5 champions les plus forts par poste, en classée solo/duo, selon ton niveau.</p>
         </header>
-        <div class="toolbar">
+        <div class="toolbar" data-float>
           <div class="seg" id="mTier"></div>
           <div class="seg" id="mSort"></div>
         </div>
@@ -170,7 +175,7 @@
           <h3>Postes préférés</h3>
           <p class="muted">
             Tu joues un champion à un poste inhabituel (Shen support, Akali support…) ? Indique-le : quand le client ne donne pas ton poste
-            (partie normale à l'aveugle, modes spéciaux), BuildSense utilise celui-ci. Pendant une partie, tu peux aussi changer de poste avec
+            (partie normale à l'aveugle, modes spéciaux), Stonks utilise celui‑ci. Pendant une partie, tu peux aussi changer de poste avec
             <kbd id="roleKey">Ctrl+Maj+P</kbd> ou depuis la page En direct.
           </p>
           <div class="inline wrap">
@@ -181,7 +186,7 @@
           <div class="preflist" id="prefList"></div>
         </div>
 
-        <div class="toolbar">
+        <div class="toolbar" data-float>
           <div class="search">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
             <input id="champSearch" placeholder="Rechercher un champion…" autocomplete="off" spellcheck="false" />
@@ -311,7 +316,7 @@
               <span class="switch"><input type="checkbox" id="autoRunes" /><i></i></span>
             </label>
             <label class="switch-row">
-              <span><b>Page d'objets dans la boutique</b><small>Ajoute une page « BuildSense » dans l'onglet Recommandés de la boutique, avec le meilleur départ en premier</small></span>
+              <span><b>Page d'objets dans la boutique</b><small>Ajoute une page « Stonks » dans l'onglet Recommandés de la boutique, avec le meilleur départ en premier</small></span>
               <span class="switch"><input type="checkbox" id="autoItemSet" /><i></i></span>
             </label>
             <label class="field">
@@ -345,7 +350,7 @@
           <label class="field">
             <span>Dépôt GitHub des versions</span>
             <div class="inline">
-              <input id="updRepo" placeholder="pseudo/buildsense" spellcheck="false" autocomplete="off" />
+              <input id="updRepo" placeholder="pseudo/depot" spellcheck="false" autocomplete="off" />
               <button id="updRepoSave" class="btn ghost small">OK</button>
             </div>
           </label>
@@ -367,13 +372,14 @@
       </section>
 
       <footer class="legal">
-        BuildSense n'est pas approuvé par Riot Games et ne reflète pas les opinions de Riot Games ni de quiconque officiellement impliqué dans la
+        Stonks n'est pas approuvé par Riot Games et ne reflète pas les opinions de Riot Games ni de quiconque officiellement impliqué dans la
         production ou la gestion des propriétés de Riot Games. Riot Games et toutes les propriétés associées sont des marques commerciales ou des
         marques déposées de Riot Games, Inc.
       </footer>
     </main>
 
     <div id="toast" hidden></div>
+    <script src="mascot.js"></script>
     <script src="dashboard.js"></script>
   </body>
 </html>

@@ -16,4 +16,4 @@ if not exist "node_modules\electron\dist" (
     exit /b 1
   )
 )
-start "BuildSense" /min cmd /c "npm start"
+start "Stonks" /min cmd /c "npm start"

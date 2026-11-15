@@ -6,11 +6,11 @@ const crypto = require('crypto');
 const { EventEmitter } = require('events');
 
 /**
- * Mises à jour de BuildSense.
+ * Mises à jour de Stonks.
  *
  * Chaque version publiée (GitHub Releases) contient l'installeur et un petit fichier latest.json :
  *   { "version": "1.3.0", "date": "2026-11-08", "notes": ["..."],
- *     "installer": { "url": "https://.../BuildSense-Setup-1.3.0.exe", "sha256": "…", "size": 123 } }
+ *     "installer": { "url": "https://.../Stonks-Setup-1.3.0.exe", "sha256": "…", "size": 123 } }
  * L'appli lit latest.json, télécharge l'installeur en fond, vérifie sa taille et son empreinte SHA-256,
  * puis le lance en mode silencieux (aucune fenêtre, aucun droit administrateur) et redémarre.
  *
@@ -210,7 +210,7 @@ class Updater extends EventEmitter {
   }
 
   targetFile() {
-    return path.join(this.downloadDir, `BuildSense-Setup-${this.manifest.version}.exe`);
+    return path.join(this.downloadDir, `Stonks-Setup-${this.manifest.version}.exe`);
   }
 
   /** Télécharge l'installeur annoncé, vérifie taille et SHA-256. */
@@ -281,7 +281,7 @@ class Updater extends EventEmitter {
   cleanup() {
     try {
       for (const f of fs.readdirSync(this.downloadDir)) {
-        const v = /^BuildSense-Setup-(\d+\.\d+\.\d+)\.exe(\.part)?$/.exec(f);
+        const v = /^(?:Stonks|BuildSense)-Setup-(\d+\.\d+\.\d+)\.exe(\.part)?$/.exec(f);
         if (v && (v[2] || compareVersions(v[1], this.currentVersion) <= 0)) fs.rmSync(path.join(this.downloadDir, f), { force: true });
       }
     } catch {

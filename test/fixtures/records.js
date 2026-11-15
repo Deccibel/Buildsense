@@ -188,6 +188,41 @@ function supportRecords(n = 80, seed = 13) {
   return out;
 }
 
+/**
+ * Thresh support : 2 à 3 objets complets, bottes, et l'évolution de l'objet de support en fin de partie
+ * (Opposition céleste le plus souvent, Rêve éveillé sinon ; quête pas finie dans quelques parties).
+ */
+function threshSupportRecords(n = 60, seed = 23) {
+  const rnd = lcg(seed);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = rnd() < 0.6;
+    const third = rnd() < 0.35;
+    const boots = rnd() < 0.7 ? 3047 : 3111;
+    const leaf = i % 12 === 0 ? 3866 : rnd() < 0.65 ? 3869 : 3870;
+    const core = a ? [[3143, 13], [boots, 16], [3075, 22]] : [[3065, 14], [boots, 17], [3143, 23]];
+    if (third) core.push([2065, 29]);
+    out.push({
+      m: `EUW1_T${7000 + i}`,
+      v: '16.21',
+      c: K.Thresh,
+      r: 'UTILITY',
+      w: rnd() < (leaf === 3869 ? 0.56 : 0.48) ? 1 : 0,
+      d: 30,
+      s: [4, 14],
+      ru: PAGES.phase,
+      st: [3865, 2003, 2003],
+      co: core,
+      fi: [leaf, ...core.map((x) => x[0])],
+      sk: SK_QEW,
+      e: [K.Aatrox, K.Sejuani, K.Zed, K.Jinx, K.Soraka],
+      o: K.Soraka,
+      a: [K.Ornn, K.Viego, K.Ahri, K.Kaisa],
+    });
+  }
+  return out;
+}
+
 /** Quelques parties d'Ahri jouée support (poste inhabituel). */
 function ahriSupportRecords(n = 4, seed = 17) {
   const rnd = lcg(seed);
@@ -257,4 +292,4 @@ function roleRecords(seed = 3) {
   return out;
 }
 
-module.exports = { metaRecords, ahriRecords, aramAhriRecords, arenaAhriRecords, supportRecords, ahriSupportRecords, roleRecords, K, PAGES };
+module.exports = { metaRecords, ahriRecords, aramAhriRecords, arenaAhriRecords, supportRecords, ahriSupportRecords, threshSupportRecords, roleRecords, K, PAGES };

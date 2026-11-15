@@ -1,4 +1,4 @@
-# Publie automatiquement une version de BuildSense (bêta PG-AAAAMMJJ-bN, ou stable vX.Y.Z).
+# Publie automatiquement une version de Stonks (bêta PG-AAAAMMJJ-bN, ou stable vX.Y.Z).
 # Déclenché quand package.json change sur main : si la version n'est pas encore publiée,
 # un Windows de GitHub lance les tests, construit l'installeur et crée la Release
 # (installeur + latest.json). Les applis installées la détectent ensuite toutes seules.
@@ -31,7 +31,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           # bêta : tag PG-AAAAMMJJ-bN (publiée tout de suite) ; stable : tag vX.Y.Z
-          TAG=$(node -p "const b=require('./package.json').buildsense||{}; b.channel==='beta' ? b.betaName : 'v'+require('./package.json').version")
+          TAG=$(node -p "const b=require('./package.json').stonks||{}; b.channel==='beta' ? b.betaName : 'v'+require('./package.json').version")
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release view "v$V" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -69,7 +69,7 @@ jobs:
         if: steps.v.outputs.publish == 'true'
         shell: pwsh
         run: |
-          $f = "dist\BuildSense-Setup-${{ steps.v.outputs.version }}.exe"
+          $f = "dist\Stonks-Setup-${{ steps.v.outputs.version }}.exe"
           if (-not (Test-Path $f)) { throw "Installeur introuvable : $f" }
           "{0:N1} Mo" -f ((Get-Item $f).Length / 1MB)
 

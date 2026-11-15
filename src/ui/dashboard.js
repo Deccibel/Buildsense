@@ -13,6 +13,9 @@ let lastFavKey = '';
 let lastLiveKey = '';
 let hadLive = false;
 let lastPrefKey = '';
+// mascotte : celle de la barre latérale (le logo vivant) et celle des cartes vides
+let mascot = null;
+let bigMascot = null;
 
 const PHASES = {
   None: 'accueil',
@@ -143,6 +146,58 @@ function showToast({ text, level }) {
   t.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.hidden = true), 4500);
+  if (mascot) {
+    if (level === 'ok') mascot.react('happy', 2200, 'hop');
+    else if (level === 'warn') mascot.react('worried', 2400, 'shake');
+    else mascot.react('surprised', 1600, 'pop');
+  }
+}
+
+// ---------------------------------------------------------------- mascotte
+
+const windowActive = () => !document.hidden && document.hasFocus();
+
+/** Mascotte de la barre latérale : elle ne s'anime que quand la fenêtre est au premier plan, et son humeur suit l'appli. */
+function initMascot() {
+  if (!window.StonksMascot) return;
+  mascot = window.StonksMascot.create({ size: 46, clickable: true });
+  $('#mascot').append(mascot.el);
+  const alive = () => {
+    mascot.setAlive(windowActive());
+    if (bigMascot) bigMascot.setAlive(windowActive());
+  };
+  window.addEventListener('focus', alive);
+  window.addEventListener('blur', alive);
+  document.addEventListener('visibilitychange', alive);
+  alive();
+}
+
+/** Mascotte des cartes vides de la page En direct (une seule, déplacée d'une carte à l'autre). */
+function emptyMascot(mood) {
+  if (!window.StonksMascot) return null;
+  if (!bigMascot) {
+    bigMascot = window.StonksMascot.create({ size: 72, clickable: true, sleepAfter: 25 });
+    bigMascot.setAlive(windowActive());
+  }
+  bigMascot.setMood(mood || 'idle');
+  return bigMascot.el;
+}
+
+function mascotMood(s) {
+  if (!mascot) return;
+  const c = s.crawler.state;
+  let mood = 'idle';
+  if (s.game.inGame) mood = 'focus';
+  else if (s.game.champSelect) mood = 'surprised';
+  else if (c === 'waiting' || c === 'nokey' || s.dd.error) mood = 'worried';
+  mascot.setMood(mood);
+}
+
+/** Curseurs : la partie remplie suit la valeur (voir input[type='range'] dans dashboard.css). */
+function syncRange(r) {
+  const min = Number(r.min) || 0;
+  const max = Number(r.max) || 100;
+  r.style.setProperty('--val', `${((Number(r.value) - min) / (max - min || 1)) * 100}%`);
 }
 
 function goto(page) {
@@ -228,32 +283,10 @@ function renderStatus(s, ci) {
 }
 
 function renderSetup(s, hasKey) {
-  let windowed = false;
-  try {
-    windowed = localStorage.getItem('bs-windowed') === '1';
-  } catch {
-    windowed = false;
-  }
   const keyOk = hasKey && s.crawler.state !== 'nokey';
   const steps = [
     { done: keyOk, title: 'Ajoute ta clé API Riot', sub: 'Gratuite sur developer.riotgames.com', action: ['Réglages', () => goto('settings')] },
     { done: s.favorites.length > 0, title: 'Choisis tes champions', sub: 'Leurs builds sont collectés en priorité', action: ['Choisir', () => goto('champs')] },
-    {
-      done: windowed,
-      title: 'Passe LoL en « Fenêtré sans bordure »',
-      sub: 'Options › Vidéo › Mode fenêtre, sinon l’overlay reste invisible',
-      action: [
-        "C'est fait",
-        () => {
-          try {
-            localStorage.setItem('bs-windowed', '1');
-          } catch {
-            /* rien */
-          }
-          render();
-        },
-      ],
-    },
     {
       done: s.store.records >= 3000,
       title: 'Laisse la collecte tourner',
@@ -446,7 +479,7 @@ function renderRolePrefs() {
   if (key === lastPrefKey) return;
   lastPrefKey = key;
   if (!entries.length) {
-    $('#prefList').replaceChildren(el('div', 'muted small', 'Aucun poste préféré : BuildSense utilise le poste donné par le client, sinon le plus joué.'));
+    $('#prefList').replaceChildren(el('div', 'muted small', 'Aucun poste préféré : Stonks utilise le poste donné par le client, sinon le plus joué.'));
     return;
   }
   $('#prefList').replaceChildren(
@@ -535,7 +568,7 @@ function lvPath(items, extra) {
     { class: 'lv-path' },
     items.map((c, i) => [
       i ? h('span', { class: 'chev' }, '›') : null,
-      h('div', { class: `lv-step ${c.owned ? 'owned' : ''} ${c.situational ? 'situ' : ''}` }, ico(c.icon, c.name), h('span', null, c.name), c.owned ? h('span', { class: 'ok' }, '✓') : null),
+      h('div', { class: `lv-step ${c.owned ? 'owned' : ''} ${c.situational ? 'situ' : ''} ${c.support ? 'sup' : ''}` }, ico(c.icon, c.name), h('span', null, c.name), c.owned ? h('span', { class: 'ok' }, '✓') : null),
     ]),
     extra ? [h('span', { class: 'chev' }, '+'), h('div', { class: 'lv-step' }, ico(extra.icon, extra.name), h('span', null, extra.name))] : null,
   );
@@ -548,6 +581,31 @@ function lvSkills(sk) {
     null,
     h('div', { class: 'lv-skills' }, h('span', { class: 't' }, 'Max'), sk.order.map((k, i) => [i ? h('span', { class: 'chev' }, '›') : null, h('span', { class: 'kc' }, k)])),
     sk.first && sk.first.length ? h('div', { class: 'lv-skills' }, h('span', { class: 't' }, 'Début'), sk.first.map((k) => h('span', { class: 'kc small' }, k))) : null,
+  );
+}
+
+/** Objet de support : évolution à privilégier, pourquoi, et les alternatives. */
+function supportCard(s) {
+  if (!s || s.state === 'done') return null;
+  const choose = s.state === 'choose';
+  return h(
+    'div',
+    { class: `card lv-card lv-support ${choose ? 'choose' : ''}` },
+    h('div', { class: 'lv-t' }, h('h3', null, 'Objet de support'), h('span', { class: 'meta' }, choose ? 'quête terminée : à choisir maintenant' : 'à prendre en fin de quête')),
+    h(
+      'div',
+      { class: 'lv-opt best' },
+      ico(s.item.icon, s.item.name),
+      h(
+        'div',
+        { class: 'body' },
+        h('div', { class: 'row' }, h('b', null, s.item.name), h('span', { class: 'tag' }, 'gratuit')),
+        h('ul', null, s.note ? h('li', { class: 'boost' }, s.note) : null, s.item.passive ? h('li', null, `${s.item.passive.name} : ${s.item.passive.text}`) : null),
+      ),
+    ),
+    s.options.length
+      ? h('div', { class: 'lv-supalts' }, h('span', { class: 't' }, 'Sinon'), s.options.map((o) => h('span', { class: 'bd-alt', title: o.passive ? o.passive.text : '' }, ico(o.icon, o.name), h('span', null, o.name), h('small', null, o.share))))
+      : null,
   );
 }
 
@@ -592,6 +650,8 @@ function liveIngame(vm) {
       ),
     );
   }
+  const supCard = supportCard(vm.support);
+  if (supCard) left.push(supCard);
   const p = vm.plan;
   if (p || vm.boots) {
     left.push(
@@ -720,7 +780,17 @@ function liveChampSelect(vm) {
   if (vm.start) right.push(card('Départ', null, row(vm.start, true)));
   const sk = lvSkills(vm.skills);
   if (sk) right.push(sk);
-  if (vm.core.length) right.push(card(vm.coreTitle || 'Build type', null, lvPath(vm.core, vm.boots)));
+  if (vm.core.length) {
+    const sup = vm.support;
+    right.push(
+      card(
+        vm.coreTitle || 'Build type',
+        null,
+        lvPath(sup ? [{ ...sup.item, support: true }, ...vm.core] : vm.core, vm.boots),
+        sup ? h('div', { class: 'lv-why' }, h('div', null, h('b', { class: 'supname' }, `${sup.item.name} : `), `objet de support à prendre en fin de quête · ${sup.note}`)) : null,
+      ),
+    );
+  }
   if (vm.enemies.length) {
     right.push(
       card(
@@ -766,18 +836,23 @@ function renderLive(s, force = false) {
     view.replaceChildren(
       h(
         'div',
-        { class: 'card lv-empty' },
-        h('h3', null, 'Aucune partie en cours'),
-        h('p', { class: 'muted' }, phase ? `Client LoL : ${phase}. Cette page se remplit dès la sélection des champions.` : 'Lance League of Legends : cette page se remplit dès la sélection des champions.'),
-        h('div', { class: 'btns' }, [['ingame', 'Aperçu en partie'], ['aram', 'Aperçu ARAM'], ['champselect', 'Aperçu sélection']].map(([d, t]) =>
-          h('button', { class: 'btn ghost', onclick: async () => { state = await api.invoke('demo:set', d); render(); } }, t),
-        )),
+        { class: 'card lv-empty with-mascot' },
+        emptyMascot('idle'),
+        h(
+          'div',
+          null,
+          h('h3', null, 'Aucune partie en cours'),
+          h('p', { class: 'muted' }, phase ? `Client LoL : ${phase}. Cette page se remplit dès la sélection des champions.` : 'Lance League of Legends : cette page se remplit dès la sélection des champions.'),
+          h('div', { class: 'btns' }, [['ingame', 'Aperçu en partie'], ['aram', 'Aperçu ARAM'], ['champselect', 'Aperçu sélection']].map(([d, t]) =>
+            h('button', { class: 'btn ghost', onclick: async () => { state = await api.invoke('demo:set', d); render(); } }, t),
+          )),
+        ),
       ),
     );
     return;
   }
   if (vm.mode === 'message') {
-    view.replaceChildren(h('div', { class: 'card lv-empty' }, h('h3', null, vm.title), h('p', { class: 'muted' }, vm.text)));
+    view.replaceChildren(h('div', { class: 'card lv-empty with-mascot' }, emptyMascot('surprised'), h('div', null, h('h3', null, vm.title), h('p', { class: 'muted' }, vm.text))));
     return;
   }
   view.replaceChildren(
@@ -799,13 +874,13 @@ function updateText(u) {
     case 'checking':
       return 'Recherche d’une nouvelle version…';
     case 'up-to-date':
-      return `BuildSense ${u.current} est à jour.`;
+      return `Stonks ${u.current} est à jour.`;
     case 'available':
       return u.error ? `Version ${u.latest} disponible. Le téléchargement a échoué : ${u.error}` : `Version ${u.latest} disponible${u.playing ? ' : téléchargement après ta partie' : ''}.`;
     case 'downloading':
       return `Téléchargement de la version ${u.latest} : ${Math.floor((u.received / (u.size || 1)) * 100)} % (${mb(u.received)} / ${mb(u.size)})`;
     case 'ready':
-      return u.playing ? `Version ${u.latest} prête : elle s’installera quand ta partie sera finie.` : `Version ${u.latest} prête à être installée (moins d’une minute, BuildSense redémarre tout seul).`;
+      return u.playing ? `Version ${u.latest} prête : elle s’installera quand ta partie sera finie.` : `Version ${u.latest} prête à être installée (moins d’une minute, Stonks redémarre tout seul).`;
     case 'error':
       return `Impossible de vérifier les mises à jour : ${u.error}`;
     default:
@@ -819,18 +894,19 @@ async function installUpdate() {
 }
 
 const ACCENT_LIST = [
-  ['cyan', 'Cyan', '#2ee6c5'],
-  ['red', 'Rouge', '#ff4d5e'],
-  ['green', 'Vert', '#3ddc84'],
-  ['yellow', 'Jaune', '#f5d142'],
-  ['orange', 'Orange', '#ff9a3c'],
-  ['purple', 'Mauve', '#b48cff'],
-  ['blue', 'Bleu', '#4d9fff'],
+  ['stonks', 'Stonks', 'linear-gradient(135deg, #6ef3c5, #3f9bff 52%, #8a5bff)'],
+  ['cyan', 'Cyan', 'linear-gradient(135deg, #8ff7e4, #2ee6c5 50%, #22b8e6)'],
+  ['red', 'Rouge', 'linear-gradient(135deg, #ff9a6b, #ff4d5e 50%, #d83a8c)'],
+  ['green', 'Vert', 'linear-gradient(135deg, #c2f58a, #3ddc84 50%, #17b8a0)'],
+  ['yellow', 'Jaune', 'linear-gradient(135deg, #fff08a, #f5d142 50%, #ff9f43)'],
+  ['orange', 'Orange', 'linear-gradient(135deg, #ffd166, #ff9a3c 50%, #ff5e62)'],
+  ['purple', 'Mauve', 'linear-gradient(135deg, #e0a3ff, #b48cff 50%, #7c5cff)'],
+  ['blue', 'Bleu', 'linear-gradient(135deg, #7fd0ff, #4d9fff 50%, #4a6bff)'],
   ['classic', 'Classique LoL', 'linear-gradient(135deg, #c8aa6e 0 50%, #0a1428 50% 100%)'],
 ];
 
 function renderAppearance(s) {
-  const a = s.config.appearance || { theme: 'dark', accent: 'cyan' };
+  const a = s.config.appearance || { theme: 'dark', accent: 'stonks' };
   document.documentElement.dataset.accent = a.accent;
   for (const b of $$('#themeSeg button')) b.classList.toggle('active', b.dataset.theme === a.theme);
   const box = $('#accentPick');
@@ -862,7 +938,7 @@ function renderUpdate(s) {
     if (cardEl.dataset.key !== key) {
       cardEl.dataset.key = key;
       const pct = Math.floor((u.received / (u.size || 1)) * 100);
-      const title = u.status === 'ready' ? `BuildSense ${u.latest} est prête` : `BuildSense ${u.latest} est disponible`;
+      const title = u.status === 'ready' ? `Stonks ${u.latest} est prête` : `Stonks ${u.latest} est disponible`;
       const actions = [];
       if (u.status === 'ready') {
         actions.push(h('button', { class: 'btn', disabled: u.playing ? 'disabled' : null, onclick: installUpdate }, u.playing ? 'Après ta partie' : 'Redémarrer et mettre à jour'));
@@ -888,7 +964,7 @@ function renderUpdate(s) {
     wn.dataset.v = s.whatsNew.version;
     wn.replaceChildren(
       ...[
-        h('div', { class: 'upd-head' }, h('span', { class: 'upd-icon ok' }, '✓'), h('div', null, h('h3', null, `BuildSense est passée en version ${s.whatsNew.version}`), h('p', { class: 'muted' }, s.whatsNew.notes.length ? 'Les nouveautés :' : 'Mise à jour installée.'))),
+        h('div', { class: 'upd-head' }, h('span', { class: 'upd-icon ok' }, '✓'), h('div', null, h('h3', null, `Stonks est passée en version ${s.whatsNew.version}`), h('p', { class: 'muted' }, s.whatsNew.notes.length ? 'Les nouveautés :' : 'Mise à jour installée.'))),
         s.whatsNew.notes.length ? h('ul', { class: 'upd-notes' }, s.whatsNew.notes.map((n) => h('li', null, n))) : null,
         h('div', { class: 'btns' }, h('button', { class: 'btn ghost', onclick: async () => { state = await api.invoke('whatsnew:dismiss'); render(); } }, 'OK')),
       ].filter(Boolean),
@@ -993,7 +1069,7 @@ function renderBuilds() {
           h('h3', null, v.label, v.favorite ? h('span', { class: 'tag' }, '★ ton build') : null, (v.players || []).some((p) => p.pro) ? h('span', { class: 'tag pro' }, `joué par ${v.players.find((p) => p.pro).pro.name}`) : null),
           h('span', { class: 'meta' }, [v.share ? `${Math.round(v.share * 100)} % des parties` : null, `${fmt(v.n)} parties`, v.wr ? `${Math.round(v.wr * 100)} % de victoires` : null].filter(Boolean).join(' · ')),
         ),
-        h('div', { class: 'b-click', role: 'button', tabindex: '0', title: 'Voir le détail du build', onclick: () => toggleBuild(v), onkeydown: (e) => { if (e.key === 'Enter') toggleBuild(v); } }, lvPath(v.boots ? [v.boots, ...v.items] : v.items), h('span', { class: 'b-more' }, bOpen === v.id ? 'Masquer le détail ▴' : 'Voir le détail : joueurs, pourquoi ces objets ▾')),
+        h('div', { class: 'b-click', role: 'button', tabindex: '0', title: 'Voir le détail du build', onclick: () => toggleBuild(v), onkeydown: (e) => { if (e.key === 'Enter') toggleBuild(v); } }, lvPath([v.support ? { ...v.support, support: true } : null, v.boots, ...v.items].filter(Boolean)), h('span', { class: 'b-more' }, bOpen === v.id ? 'Masquer le détail ▴' : 'Voir le détail : joueurs, pourquoi ces objets ▾')),
         bOpen === v.id ? (bDetail && bDetail.empty ? h('p', { class: 'muted small' }, 'Pas assez de parties pour détailler ce build.') : renderBuildDetail(bDetail)) : null,
         h(
           'div',
@@ -1183,6 +1259,7 @@ function render() {
   const ci = crawlerInfo(s, hasKey);
 
   renderStatus(s, ci);
+  mascotMood(s);
   renderSetup(s, hasKey);
   renderModeStats(s);
   renderSettingsExtras(s);
@@ -1223,6 +1300,8 @@ function render() {
   // overlay
   if (document.activeElement !== $('#opacity')) $('#opacity').value = cfg.overlay.opacity;
   if (document.activeElement !== $('#scale')) $('#scale').value = cfg.overlay.scale;
+  syncRange($('#opacity'));
+  syncRange($('#scale'));
   $('#compact').checked = !!cfg.overlay.compact;
   for (const b of $$('[data-demo]')) {
     const d = b.dataset.demo;
@@ -1340,6 +1419,7 @@ function bind() {
     state = await api.invoke('overlay:resetPosition');
     render();
   });
+  for (const r of $$("input[type='range']")) r.addEventListener('input', () => syncRange(r));
   $('#opacity').addEventListener('change', (e) => saveConfig({ overlay: { opacity: Number(e.target.value) } }));
   $('#scale').addEventListener('change', (e) => saveConfig({ overlay: { scale: Number(e.target.value) } }));
   $('#compact').addEventListener('change', (e) => saveConfig({ overlay: { compact: e.target.checked } }));
@@ -1508,7 +1588,7 @@ function renderCoach(s, force = false) {
       items,
       h('div', { class: 'co-grid' }, done, improve),
       c.championVideo ? h('div', { class: 'btns' }, h('button', { class: 'btn ghost small', onclick: () => openUrl(c.championVideo.url) }, '▶ ', c.championVideo.label)) : null,
-      h('p', { class: 'muted small' }, 'Repères généraux par poste. Les timings d’objets viennent des parties des meilleurs joueurs collectées par BuildSense.'),
+      h('p', { class: 'muted small' }, 'Repères généraux par poste. Les timings d’objets viennent des parties des meilleurs joueurs collectées par Stonks.'),
     ),
   );
 }
@@ -1606,6 +1686,21 @@ function renderBuildDetail(d) {
     ),
   );
   const side = [];
+  const support = d.support
+    ? h(
+        'div',
+        { class: 'bd-support' },
+        h('h4', null, 'Objet de support', h('small', null, d.support.generic ? ' · d’après les supports du même style' : ' · évolution gratuite, à choisir en fin de quête')),
+        d.support.options.map((o, i) =>
+          h(
+            'div',
+            { class: `bd-slot ${i === 0 ? 'best' : ''}` },
+            h('div', { class: 'bd-item' }, h('span', { class: 'rk' }, i === 0 ? '★' : ''), ico(o.icon, o.name), h('div', null, h('b', null, o.name), h('small', null, [`${pct0(o.share)} des parties`, o.n >= 8 ? `${pct0(o.wr)} victoires` : null, o.when.length ? `plutôt ${o.when[0]}` : null].filter(Boolean).join(' · ')))),
+            o.passive ? h('ul', { class: 'bd-why' }, h('li', null, `${o.passive.name} : ${o.passive.text}`)) : null,
+          ),
+        ),
+      )
+    : null;
   if (d.boots && d.boots.length) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Bottes'), d.boots.map((b) => h('span', { class: 'bd-alt' }, ico(b.icon, b.name), h('span', null, b.name), h('small', null, pct0(b.share))))));
   if (d.start) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Départ'), d.start.list.map((it) => ico(it.icon, it.name)), h('small', null, pct0(d.start.share))));
   if (d.spells) side.push(h('div', { class: 'bd-row' }, h('span', { class: 't' }, 'Sorts'), d.spells.list.map((sp) => h('span', { class: 'bd-alt' }, ico(sp.icon, sp.name, 'round'), h('span', null, sp.name))), h('small', null, pct0(d.spells.share))));
@@ -1630,6 +1725,7 @@ function renderBuildDetail(d) {
     { class: 'bd' },
     h('p', { class: 'muted small' }, `${fmt(d.n)} parties · ${pct0(d.wr)} de victoires${d.duration ? ` · parties de ${d.duration} min en moyenne` : ''}`),
     h('div', { class: 'bd-slots' }, slots),
+    support,
     side.length ? h('div', { class: 'bd-side' }, side) : null,
     players,
   );
@@ -1750,9 +1846,9 @@ function renderProgress(s, force = false) {
   );
   if (!p.total) {
     const why = !p.hasKey
-      ? 'Ajoute ta clé API Riot (Réglages) : BuildSense récupère alors tes dernières parties pour ton bilan et ton objectif.'
+      ? 'Ajoute ta clé API Riot (Réglages) : Stonks récupère alors tes dernières parties pour ton bilan et ton objectif.'
       : !p.riotId
-        ? 'Ouvre le client League of Legends : BuildSense y lit ton Riot ID, puis récupère tes 20 dernières parties.'
+        ? 'Ouvre le client League of Legends : Stonks y lit ton Riot ID, puis récupère tes 20 dernières parties.'
         : p.error || (p.syncing ? 'Récupération de tes dernières parties…' : 'Aucune partie récente trouvée sur ce compte.');
     box.replaceChildren(h('div', { class: 'card lv-card' }, head, h('p', { class: 'muted' }, why), p.hasKey && p.riotId ? h('div', { class: 'btns' }, h('button', { class: 'btn ghost small', onclick: syncProgress }, 'Actualiser')) : null));
     return;
@@ -1848,6 +1944,7 @@ async function syncProgress() {
 }
 
 async function start() {
+  initMascot();
   bind();
   state = await api.invoke('app:getState');
   render();

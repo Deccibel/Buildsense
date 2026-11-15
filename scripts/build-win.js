@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Construit la version Windows de BuildSense :
- *   1. dist/BuildSense-win32-x64/BuildSense.exe   (appli prête à lancer)
- *   2. dist/BuildSense-Setup-<version>.exe         (installeur, si NSIS est disponible)
+ * Construit la version Windows de Stonks :
+ *   1. dist/Stonks-win32-x64/Stonks.exe   (appli prête à lancer)
+ *   2. dist/Stonks-Setup-<version>.exe         (installeur, si NSIS est disponible)
  *
  *   npm run dist:win
  *
@@ -51,14 +51,14 @@ if (isWin) {
   execFileSync(csc, ['/nologo', '/optimize', '/target:exe', `/out:${keywatch}`, path.join(ROOT, 'native', 'keywatch.cs')], { stdio: 'inherit' });
 }
 
-// 1. Appli Windows (BuildSense.exe + fichiers d'Electron)
+// 1. Appli Windows (Stonks.exe + fichiers d'Electron)
 // L'appli n'a aucune dépendance à l'exécution : node_modules ne contient que les outils de dev.
-const ignore = '^/(node_modules|test|scripts|build|dist|preview|data|native|README\\.md|CHANGELOG\\.md|Lancer BuildSense\\.bat|\\.git\\w*|\\.github|package-lock\\.json)($|/)';
+const ignore = '^/(node_modules|test|scripts|build|dist|preview|data|native|README\\.md|CHANGELOG\\.md|Lancer Stonks\\.bat|\\.git\\w*|\\.github|package-lock\\.json)($|/)';
 // lancé directement avec node (pas de shell : sous Windows, cmd.exe casserait l'expression --ignore)
 run(process.execPath, [
   path.join(ROOT, 'node_modules', '@electron', 'packager', 'bin', 'electron-packager.mjs'),
   '.',
-  'BuildSense',
+  'Stonks',
   '--platform=win32',
   '--arch=x64',
   `--out=${DIST}`,
@@ -69,23 +69,23 @@ run(process.execPath, [
   `--ignore=${ignore}`,
   `--app-version=${pkg.version}`,
   `--build-version=${pkg.version}`,
-  '--app-copyright=BuildSense',
-  '--win32metadata.CompanyName=BuildSense',
-  '--win32metadata.ProductName=BuildSense',
-  '--win32metadata.FileDescription=BuildSense',
-  '--win32metadata.InternalName=BuildSense',
-  '--win32metadata.OriginalFilename=BuildSense.exe',
+  '--app-copyright=Stonks',
+  '--win32metadata.CompanyName=Stonks',
+  '--win32metadata.ProductName=Stonks',
+  '--win32metadata.FileDescription=Stonks',
+  '--win32metadata.InternalName=Stonks',
+  '--win32metadata.OriginalFilename=Stonks.exe',
 ]);
-const appDir = path.join(DIST, 'BuildSense-win32-x64');
-console.log(`\nAppli prête : ${path.join(appDir, 'BuildSense.exe')}`);
+const appDir = path.join(DIST, 'Stonks-win32-x64');
+console.log(`\nAppli prête : ${path.join(appDir, 'Stonks.exe')}`);
 
 // 2. Installeur
 const makensis = findMakensis();
 if (!makensis) {
-  console.log("\nNSIS introuvable : pas d'installeur. Le dossier ci-dessus suffit pour lancer BuildSense.exe.");
+  console.log("\nNSIS introuvable : pas d'installeur. Le dossier ci-dessus suffit pour lancer Stonks.exe.");
   process.exit(0);
 }
-const out = path.join(DIST, `BuildSense-Setup-${pkg.version}.exe`);
+const out = path.join(DIST, `Stonks-Setup-${pkg.version}.exe`);
 const nsisDir = process.env.NSIS_DIR || path.dirname(makensis);
 run(
   makensis,

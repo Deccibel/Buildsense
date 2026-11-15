@@ -1,6 +1,14 @@
-# Nouveautés de BuildSense
+# Nouveautés de Stonks (anciennement BuildSense)
 
 Les lignes de chaque section s'affichent dans l'appli quand la mise à jour est proposée.
+
+## 2.0.0
+
+- BuildSense devient Stonks : nouveau nom, nouveau logo et une mascotte, une petite bille en dégradé qui suit ton curseur des yeux, s'occupe toute seule et réagit à ce qui se passe (partie, erreur, notification).
+- Nouveau design « verre » : fenêtre sans barre de titre, fond en dégradé, cartes translucides, boutons et interrupteurs arrondis, en clair comme en sombre. L'overlay passe aussi au verre, plus lisible sur le jeu.
+- Nouvelle couleur par défaut « Stonks » (menthe, azur, violet) ; chaque couleur est maintenant un dégradé. Ton ancienne couleur reste disponible dans Réglages › Apparence.
+- Supports : l'objet de support à privilégier en fin de quête (Opposition céleste, Rêve éveillé, Pique dimensionnelle, Mélodie du sang…), d'après les meilleurs joueurs de ton champion, avec les alternatives. Rappel dans l'overlay au moment de le choisir.
+- Tes réglages, favoris et données sont gardés ; l'installeur remplace l'ancienne version BuildSense.
 
 ## 1.8.0
 

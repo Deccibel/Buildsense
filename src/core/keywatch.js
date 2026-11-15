@@ -5,7 +5,7 @@
  *
  * League of Legends bloque les raccourcis globaux de Windows (RegisterHotKey, utilisé par Electron)
  * tant que la fenêtre du jeu a le focus. Le petit programme native/keywatch.exe lit seulement l'état
- * des touches (GetAsyncKeyState) et signale les combinaisons de BuildSense. Aucun hook, aucune
+ * des touches (GetAsyncKeyState) et signale les combinaisons de Stonks. Aucun hook, aucune
  * injection, rien n'est envoyé au jeu.
  */
 

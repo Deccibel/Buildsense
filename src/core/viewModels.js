@@ -53,7 +53,7 @@ function sampleLine({ n, champName, latestPatch, hasKey, rec = {}, mode = null, 
   const fam = FAMILIES[rec.dataFamily || 'sr'] || FAMILIES.sr;
   const asked = FAMILIES[rec.family || 'sr'] || FAMILIES.sr;
   if (!hasKey && n < 10) {
-    return { text: 'Ajoute ta clé API Riot dans BuildSense pour récupérer les builds.', warn: true };
+    return { text: 'Ajoute ta clé API Riot dans Stonks pour récupérer les builds.', warn: true };
   }
   if (n < 10) {
     return {
@@ -148,9 +148,12 @@ function ingameVM({ dd, game, analysis, needs, rec, opponent, latestPatch, hasKe
   const core = rec.core
     ? rec.core.ids.map((id) => itemVM(dd, id, { owned: me.items.includes(id) })).filter(Boolean)
     : [];
-  // build complet : bottes + 5 légendaires, adapté à la partie (objets possédés en tête)
+  // objet de support : évolution à privilégier (choix gratuit en fin de quête)
+  const support = supportVM(dd, rec.support, who);
+  // build complet : (objet de support +) bottes + objets légendaires, adapté à la partie (objets possédés en tête)
   const full = rec.full
     ? [
+        ...(support ? [{ ...support.item, owned: support.state === 'done', support: true, choose: support.state === 'choose' }] : []),
         ...(rec.full.boots ? [itemVM(dd, rec.full.boots.id, { owned: rec.full.boots.owned })] : []),
         ...rec.full.items.map((x) => itemVM(dd, x.id, { owned: x.owned, situational: x.situational, reason: x.reasons[0] || null })),
       ].filter(Boolean)
@@ -215,10 +218,40 @@ function ingameVM({ dd, game, analysis, needs, rec, opponent, latestPatch, hasKe
     coreTitle: CORE_TITLE[rec.dataFamily || 'sr'] || CORE_TITLE.sr,
     coreWr: rec.core && rec.core.n >= 8 ? pctInt(rec.core.wr) : null,
     full,
+    support,
     fullTitle: rec.presetLabel ? `Ton build : ${rec.presetLabel}` : FULL_TITLE[rec.dataFamily || 'sr'] || FULL_TITLE.sr,
     alerts: showTeam ? alerts : [],
     skills: rec.skills ? { order: keysOf(rec.skills.order, '>') } : null,
     sample: sampleLine({ n: rec.n, champName: champ ? champ.name : '?', latestPatch, hasKey, rec, mode }),
+  };
+}
+
+/**
+ * Objet de support : { state, item, options, note }.
+ * state : 'done' (évolution déjà choisie), 'choose' (quête terminée : à choisir maintenant), 'plan' (à prévoir).
+ * rec = { stage, owned, options: [{ id, share, wr, n }], generic }
+ */
+function supportVM(dd, rec, who = WHO.sr) {
+  if (!rec) return null;
+  const opt = (o) => {
+    const it = dd.item(o.id);
+    return itemVM(dd, o.id, { share: pctInt(o.share), wr: o.n >= 8 ? pctInt(o.wr) : null, passive: it && it.passive ? it.passive : null });
+  };
+  if (rec.stage === 'done') {
+    const item = itemVM(dd, rec.owned);
+    return item ? { state: 'done', item, options: [], note: null } : null;
+  }
+  // les évolutions presque jamais prises ne sont pas proposées comme alternatives
+  const options = (rec.options || []).filter((o, i) => i === 0 || o.share >= 0.05).map(opt).filter(Boolean);
+  if (!options.length) return null;
+  const [item, ...rest] = options;
+  const base = rec.generic ? `${item.share} des supports du même style` : `${item.share} ${who} sur ce champion`;
+  return {
+    state: rec.stage === 'choose' ? 'choose' : 'plan',
+    item,
+    options: rest,
+    note: base,
+    generic: !!rec.generic,
   };
 }
 
@@ -329,6 +362,7 @@ function champSelectVM({ dd, cs, rec, opponent, latestPatch, hasKey, importHotke
     skills: rec.skills ? { order: keysOf(rec.skills.order, '>'), first: keysOf(rec.skills.first, ' ') } : null,
     core: rec.core ? rec.core.ids.map((id) => itemVM(dd, id)).filter(Boolean) : [],
     boots: rec.boots ? itemVM(dd, rec.boots.id) : null,
+    support: supportVM(dd, rec.support ? { stage: 'none', owned: 0, options: rec.support.options, generic: rec.support.generic } : null, WHO[rec.dataFamily || 'sr'] || WHO.sr),
     hint: page ? { key: hotkeyLabel(importHotkey), text: 'importer ces runes dans le client' } : null,
     sample: sampleLine({ n: rec.n, champName: champ.name, latestPatch, hasKey, rec, mode, kit: true }),
   };
@@ -338,4 +372,4 @@ function messageVM(title, text) {
   return { mode: 'message', title, text };
 }
 
-module.exports = { ingameVM, champSelectVM, messageVM, runePageVM, hotkeyLabel, phaseLabel, startersVM };
+module.exports = { ingameVM, champSelectVM, messageVM, runePageVM, hotkeyLabel, phaseLabel, startersVM, supportVM };

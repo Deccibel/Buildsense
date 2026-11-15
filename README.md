@@ -1,13 +1,17 @@
-# BuildSense
+<p align="center"><img src="assets/logo.png" width="128" alt="Stonks" /></p>
 
-Overlay de builds pour League of Legends. Il récupère les builds des meilleurs joueurs (Faille classée Challenger/Grand Maître, ARAM, ARAM Mayhem, Arena) et les adapte en direct à ta partie : objets, bottes, runes, sorts, départ. L'appli se met à jour toute seule.
+# Stonks
+
+*Anciennement BuildSense.* Overlay de builds pour League of Legends. Il récupère les builds des meilleurs joueurs (Faille classée Challenger/Grand Maître, ARAM, ARAM Mayhem, Arena) et les adapte en direct à ta partie : objets, bottes, runes, sorts, départ. L'appli se met à jour toute seule.
 
 ## Télécharger
 
 | Version | Pour qui | Lien |
 |---|---|---|
 | **Stable** (recommandée) | Tout le monde. Une bêta devient stable le lendemain à 9 h, si aucun bug n'a été trouvé. | [Dernière version stable](https://github.com/Deccibel/buildsense/releases/latest) |
-| **Bêta** (`PG-AAAAMMJJ-bN`) | Pour tester les nouveautés dès qu'elles sont prêtes. | [Dernière bêta](https://github.com/Deccibel/buildsense/releases/tag/beta) · [installeur direct](https://github.com/Deccibel/buildsense/releases/download/beta/BuildSense-Setup-beta.exe) |
+| **Bêta** (`PG-AAAAMMJJ-bN`) | Pour tester les nouveautés dès qu'elles sont prêtes. | [Dernière bêta](https://github.com/Deccibel/buildsense/releases/tag/beta) · [installeur direct](https://github.com/Deccibel/buildsense/releases/download/beta/Stonks-Setup-beta.exe) |
+
+> Le nouveau nom et le nouveau design (2.0) sont pour l'instant **en bêta uniquement** : la version stable reste BuildSense 1.x tant qu'ils ne sont pas validés.
 
 Tu peux changer de canal à tout moment dans l'appli : **Réglages › Mises à jour › Stable / Bêta**. En Bêta, tu reçois aussi la version stable si elle est plus récente.
 
@@ -36,12 +40,12 @@ Tu peux changer de canal à tout moment dans l'appli : **Réglages › Mises à 
 
 ## Runes
 
-Dès que tu verrouilles ton champion, la page conseillée (selon ton champion, ton poste et le mode) remplace ta page active, sans créer ni supprimer de page. Si tu changes de poste, elle est réappliquée. Si tu la retouches à la main, BuildSense n'y touche plus. Tu peux la désactiver dans Réglages.
+Dès que tu verrouilles ton champion, la page conseillée (selon ton champion, ton poste et le mode) remplace ta page active, sans créer ni supprimer de page. Si tu changes de poste, elle est réappliquée. Si tu la retouches à la main, Stonks n'y touche plus. Tu peux la désactiver dans Réglages.
 
 ## Ce que montre l'overlay
 
 - **Sélection** : adversaires, runes, sorts, départ, build type, ordre des compétences.
-- **Début de partie** : les départs possibles, le meilleur encadré « ★ Meilleur choix ». Dans la boutique, la page d'objets « BuildSense » (onglet Recommandés) suit le même ordre.
+- **Début de partie** : les départs possibles, le meilleur encadré « ★ Meilleur choix ». Dans la boutique, la page d'objets « Stonks » (onglet Recommandés) suit le même ordre.
 - **En partie** : équipe adverse (KDA, *fed*, type de dégâts), prochain objet avec ses raisons, achat possible avec ton or, alertes, et le build complet de 6 objets adapté à la partie.
 - L'onglet **Meta** de l'appli donne le top 5 des champions par poste et par élo.
 - La page **En direct** de l'appli affiche la même chose en grand, pour un second écran.
@@ -60,13 +64,13 @@ Tu peux les changer dans l'onglet Overlay (n'importe quelle disposition de clavi
 
 ## Dépannage
 
-- **L'overlay n'apparaît pas** : regarde l'onglet Overlay (mode d'affichage de LoL détecté, correction en 1 clic) et vérifie que BuildSense tourne (icône près de l'horloge). En plein écran exclusif (optimisations plein écran désactivées), aucune fenêtre ne peut passer devant le jeu.
+- **L'overlay n'apparaît pas** : regarde l'onglet Overlay (mode d'affichage de LoL détecté, correction en 1 clic) et vérifie que Stonks tourne (icône près de l'horloge). En plein écran exclusif (optimisations plein écran désactivées), aucune fenêtre ne peut passer devant le jeu.
 - **« Clé API refusée »** : ta clé de 24 h a expiré, colles-en une nouvelle.
 - **La sélection n'est pas détectée** : dans Réglages, indique le dossier de LoL (`C:\Riot Games\League of Legends` par défaut).
 - **Les runes ne s'appliquent pas** : sélectionne une page modifiable dans le client, puis appuie sur `Ctrl+Maj+R`.
 - **Mauvais poste** : appuie sur `Ctrl+Maj+P`, ou enregistre ton poste préféré pour ce champion.
-- **Des initiales à la place des icônes** : vérifie ta connexion, puis relance BuildSense.
+- **Des initiales à la place des icônes** : vérifie ta connexion, puis relance Stonks.
 
 ---
 
-BuildSense n'est pas approuvé par Riot Games et ne reflète pas les opinions de Riot Games ni de quiconque officiellement impliqué dans la production ou la gestion des propriétés de Riot Games. Riot Games et toutes les propriétés associées sont des marques commerciales ou des marques déposées de Riot Games, Inc.
+Stonks n'est pas approuvé par Riot Games et ne reflète pas les opinions de Riot Games ni de quiconque officiellement impliqué dans la production ou la gestion des propriétés de Riot Games. Riot Games et toutes les propriétés associées sont des marques commerciales ou des marques déposées de Riot Games, Inc.

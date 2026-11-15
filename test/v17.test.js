@@ -63,7 +63,7 @@ test('Mode d’affichage de LoL : lecture et passage en sans bordure (game.cfg +
   const cfg = fs.readFileSync(path.join(lol, 'Config', 'game.cfg'), 'utf8');
   assert.match(cfg, /\[General\]\r\nWindowMode=2\r\n/);
   assert.match(cfg, /\[HUD\]\r\nWindowMode=9/, 'les autres sections ne bougent pas');
-  assert.ok(fs.existsSync(path.join(lol, 'Config', 'game.cfg.buildsense.bak')), 'sauvegarde');
+  assert.ok(fs.existsSync(path.join(lol, 'Config', 'game.cfg.stonks.bak')), 'sauvegarde');
   assert.equal(gw.parseWindowMode(gw.withWindowMode('[General]\nHeight=1', 1)), 1);
   assert.equal(gw.detectLeaguePath(lol), lol);
 });
@@ -131,7 +131,7 @@ test('Mises à jour : canal bêta = la plus récente entre bêta et stable', asy
   const BETA = 'https://github.com/x/bs/releases/download/beta/latest.json';
   const STABLE = 'https://github.com/x/bs/releases/latest/download/latest.json';
   const pay = Buffer.from('installeur');
-  const man = (v) => ({ version: v, notes: [], installer: { url: `https://github.com/x/bs/releases/download/v${v}/BuildSense-Setup-${v}.exe`, sha256: sha(pay), size: pay.length } });
+  const man = (v) => ({ version: v, notes: [], installer: { url: `https://github.com/x/bs/releases/download/v${v}/Stonks-Setup-${v}.exe`, sha256: sha(pay), size: pay.length } });
   const feeds = { [BETA]: man('1.7.0'), [STABLE]: man('1.6.0') };
   const fetchImpl = async (url) => {
     const f = Object.keys(feeds).find((k) => url.startsWith(k));
@@ -209,7 +209,7 @@ test('Tes parties : tendances, point faible et objectif de session', () => {
   assert.equal(mg.liveGoal(goal, live({ cs: 10 })).state, 'behind');
   assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: 61 })).state, 'done');
   assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: 40 })).state, 'failed');
-  assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: null })).state, 'wait', 'BuildSense lancé après 10 min');
+  assert.equal(mg.liveGoal(goal, live({ time: 700, cs: 90, cs10: null })).state, 'wait', 'Stonks lancé après 10 min');
   const early = mg.pickGoal('early', tr, 'MIDDLE');
   assert.equal(mg.liveGoal(early, live({ deaths: 1, d10: 1 })).state, 'failed');
   assert.equal(mg.liveGoal(early, live({ time: 900, deaths: 3, d10: 0 })).state, 'done');

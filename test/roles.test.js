@@ -172,17 +172,25 @@ test('Runes : la page active est remplacée (pas de nouvelle page)', async () =>
   const put = calls.find((c) => c[0] === 'PUT');
   assert.equal(put[1], '/lol-perks/v1/pages/1');
   assert.deepEqual(put[2].selectedPerkIds, PAGE.selectedPerkIds);
-  assert.equal(put[2].name, 'BuildSense · Ahri Support');
+  assert.equal(put[2].name, 'Stonks · Ahri Support');
   assert.ok(!calls.some((c) => c[0] === 'POST' || c[0] === 'DELETE'));
 });
 
-test('Runes : page active non modifiable -> page BuildSense réutilisée, sinon nouvelle page', async () => {
+test('Runes : page active non modifiable -> page Stonks réutilisée, sinon nouvelle page', async () => {
   const preset = { id: 50, name: 'Page prédéfinie', current: true, isEditable: false, isDeletable: false };
-  let f = fakeLcu([preset, { id: 7, name: 'BuildSense · Zed Mid', current: false, isEditable: true }]);
+  let f = fakeLcu([preset, { id: 7, name: 'Stonks · Zed Mid', current: false, isEditable: true }]);
   let r = await f.lcu.importRunes(PAGE, 'Ahri', 'Mid');
   assert.equal(r.ok, true);
   assert.ok(f.calls.some((c) => c[0] === 'PUT' && c[1] === '/lol-perks/v1/pages/7'));
   assert.ok(f.calls.some((c) => c[0] === 'PUT' && c[1] === '/lol-perks/v1/currentpage' && c[2] === 7));
+
+  // page créée avant le changement de nom (BuildSense) : reconnue et réutilisée
+  for (const legacy of ['BuildSense · Zed Mid', 'BS · Miss Fortune Support']) {
+    f = fakeLcu([preset, { id: 9, name: legacy, current: false, isEditable: true }]);
+    r = await f.lcu.importRunes(PAGE, 'Ahri', 'Mid');
+    assert.equal(r.ok, true);
+    assert.ok(f.calls.some((c) => c[0] === 'PUT' && c[1] === '/lol-perks/v1/pages/9'), legacy);
+  }
 
   f = fakeLcu([preset]);
   r = await f.lcu.importRunes(PAGE, 'Ahri', 'Mid');
@@ -201,9 +209,9 @@ test('Runes : page active non modifiable -> page BuildSense réutilisée, sinon 
 });
 
 test('Nom de page : toujours dans la limite du client, poste conservé', () => {
-  assert.equal(pageName('Ahri', 'Mid'), 'BuildSense · Ahri Mid');
-  assert.equal(pageName('Miss Fortune', 'Support'), 'BS · Miss Fortune Support');
-  assert.equal(pageName('Nunu et Willump', 'Support'), 'BS · Nunu et Wil… Support');
+  assert.equal(pageName('Ahri', 'Mid'), 'Stonks · Ahri Mid');
+  assert.equal(pageName('Miss Fortune', 'Support'), 'ST · Miss Fortune Support');
+  assert.equal(pageName('Nunu et Willump', 'Support'), 'ST · Nunu et Wil… Support');
   const long = pageName('Unendlichkeitsschwertverzauberung', 'Support');
   assert.ok(long.length <= 25, long);
   assert.ok(long.endsWith('… Support'), long);
@@ -229,7 +237,7 @@ test('Début de partie : meilleur départ en tête, avec ses alternatives', () =
   assert.equal(computeIngame({ dd, store, rec, game: normalizeLive(clone(demoGame), dd), hasKey: true }).starters, undefined);
 });
 
-test('Boutique : page d’objets BuildSense ajoutée sans toucher aux pages du joueur', async () => {
+test('Boutique : page d’objets Stonks ajoutée sans toucher aux pages du joueur', async () => {
   const lcu = new LcuClient({ getLeaguePath: () => '/nulle-part' });
   const calls = [];
   const mine = { uid: 'perso-1', title: 'Ma page', associatedChampions: [103], blocks: [] };
@@ -241,7 +249,7 @@ test('Boutique : page d’objets BuildSense ajoutée sans toucher aux pages du j
     return { ok: true, status: 201, data: body };
   };
   const r = await lcu.writeItemSet({
-    title: 'BuildSense · Ahri Mid',
+    title: 'Stonks · Ahri Mid',
     champKey: 103,
     map: 11,
     blocks: [{ type: '★ Meilleur départ · 70 % des parties', items: [{ id: 1056, count: 1 }, { id: 2003, count: 2 }] }],
@@ -250,8 +258,8 @@ test('Boutique : page d’objets BuildSense ajoutée sans toucher aux pages du j
   const put = calls.find((c) => c[0] === 'PUT');
   assert.equal(put[1], '/lol-item-sets/v1/item-sets/42/sets');
   const sets = put[2].itemSets;
-  assert.equal(sets.length, 2, 'ancienne page BuildSense remplacée, page du joueur gardée');
-  assert.equal(sets[0].uid, 'buildsense-103');
+  assert.equal(sets.length, 2, 'ancienne page (ancien nom BuildSense) remplacée, page du joueur gardée');
+  assert.equal(sets[0].uid, 'stonks-103');
   assert.deepEqual(sets[0].blocks[0].items, [{ id: '1056', count: 1 }, { id: '2003', count: 2 }]);
   assert.ok(sets.some((s) => s.uid === 'perso-1'));
 });

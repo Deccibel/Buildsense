@@ -95,7 +95,7 @@ const LESSONS = {
     title: 'Objet peu utilisé sur ton champion',
     how: [
       'Un objet rarement pris par les meilleurs joueurs sur ce champion est souvent un piège.',
-      'Regarde l’onglet Builds de BuildSense : clique sur un build pour voir pourquoi chaque objet est choisi.',
+      'Regarde l’onglet Builds de Stonks : clique sur un build pour voir pourquoi chaque objet est choisi.',
     ],
     videos: [],
   },
@@ -131,7 +131,7 @@ class GameCoach {
     this.champKey = 0;
     this.last = null;
     this.firstT = null;
-    this.cs10 = null; // sbires à 10 min (connu seulement si BuildSense suivait la partie avant)
+    this.cs10 = null; // sbires à 10 min (connu seulement si Stonks suivait la partie avant)
     this.d10 = null; // morts avant 10 min
   }
 
@@ -167,13 +167,13 @@ class GameCoach {
     if (!me.isDead && me.gold >= 1500 && t > 120) this.hoardSec += dt;
     if (this.firstT === null) this.firstT = t;
     const deaths = (me.scores && me.scores.deaths) || 0;
-    if (t < 600) this.d10 = deaths; // le total des morts est connu même si BuildSense arrive en cours de partie
+    if (t < 600) this.d10 = deaths; // le total des morts est connu même si Stonks arrive en cours de partie
     else if (this.cs10 === null && this.firstT < 600) this.cs10 = (me.scores && me.scores.creepScore) || 0;
     if (deaths > this.lastDeaths) for (let i = this.lastDeaths; i < deaths; i++) this.deathTimes.push(t);
     this.lastDeaths = deaths;
     for (const id of me.items || []) {
       if (this.itemsAt.has(id)) continue;
-      // déjà possédé à la première lecture (BuildSense lancé en cours de partie) : heure d'achat inconnue
+      // déjà possédé à la première lecture (Stonks lancé en cours de partie) : heure d'achat inconnue
       if (dd && dd.isLegendary(id, 11)) this.itemsAt.set(id, this.samples === 1 && t > 90 ? null : t / 60);
     }
     this.last = game;

@@ -1,6 +1,7 @@
-# Chaque jour à 9 h (heure de Paris), la dernière bêta publiée la veille ou avant devient la version stable.
+# Chaque jour à 9 h (heure de Paris), la dernière bêta non retenue, publiée la veille ou avant, devient la version stable.
 # Le même installeur est republié en vX.Y.Z (marqué latest) : les applis en canal Stable le reçoivent.
-# Pause : ajouter "[hold]" dans la description de la release "beta". Promotion immédiate : lancer à la main avec "force".
+# Une bêta publiée avec "promote": false (package.json) est retenue : elle ne passe en stable que si on lance
+# ce workflow à la main avec son nom dans "tag". Tout mettre en pause : "[hold]" dans la description de la release "beta".
 name: Promouvoir la bêta en stable
 
 on:
@@ -13,9 +14,13 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Promouvoir tout de suite la dernière bêta'
+        description: 'Promouvoir tout de suite la dernière bêta non retenue'
         type: boolean
         default: false
+      tag:
+        description: 'Promouvoir cette bêta précise, même retenue (ex. PG-20261115-b2)'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -35,4 +40,4 @@ jobs:
         with:
           node-version: 22
       - name: Promotion
-        run: node scripts/promote.js ${{ inputs.force && '--force' || '' }}
+        run: node scripts/promote.js ${{ inputs.force && '--force' || '' }} ${{ inputs.tag && format('--tag={0}', inputs.tag) || '' }}

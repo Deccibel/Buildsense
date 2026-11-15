@@ -24,6 +24,7 @@ function buildsView({ dd, rec, followed = [], presets = {}, pros = null }, champ
     n: res.n,
     family: res.family,
     dataFamily: res.dataFamily,
+    supportBuild: !!res.supportBuild,
     preset,
     variants: res.variants.map((v) => {
       const ks = v.keystone ? dd.rune(v.keystone) : null;
@@ -35,6 +36,7 @@ function buildsView({ dd, rec, followed = [], presets = {}, pros = null }, champ
         label: v.source === 'player' ? `Comme ${v.player}` : v.rank === 1 ? 'Le plus joué' : `Variante ${v.rank}`,
         items: v.items.map(item).filter(Boolean),
         boots: v.boots ? item(v.boots) : null,
+        support: v.support ? item(v.support) : null,
         keystone: ks ? { name: ks.name, icon: dd.runeIcon(ks) } : null,
         n: v.n,
         share: v.share,

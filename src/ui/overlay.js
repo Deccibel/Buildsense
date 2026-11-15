@@ -8,6 +8,24 @@ const appEl = $('#app');
 let lastVm = null;
 let toastTimer = null;
 
+/*
+ * Mascotte de l'overlay : petite, immobile (aucune animation continue pendant la partie),
+ * seule son expression change selon l'objectif de session ou le message affiché.
+ */
+let mascot = null;
+function mascotEl(mood, size = 26) {
+  if (!window.StonksMascot) return null;
+  if (!mascot) {
+    mascot = window.StonksMascot.create({ size, idle: false, track: false, sleepAfter: 0 });
+    mascot.setAlive(false);
+  }
+  mascot.el.style.setProperty('--ms', `${size}px`);
+  mascot.el.classList.toggle('is-small', size <= 26);
+  mascot.setMood(mood);
+  return mascot.el;
+}
+const GOAL_MOOD = { done: 'happy', behind: 'worried', failed: 'worried', wait: 'idle' };
+
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -266,11 +284,43 @@ function startersSection(vm) {
   );
 }
 
-/** Build complet : 6 cases (bottes + 5 objets), objets possédés cochés, objets de situation signalés. */
+/** Objet de support : quête terminée, l'évolution est à choisir maintenant (gratuite, dans la boutique). */
+function supportSection(vm) {
+  const s = vm.support;
+  if (!s || s.state !== 'choose') return null;
+  return h(
+    'div',
+    { class: 'sec support' },
+    label('Objet de support', 'quête terminée'),
+    h(
+      'div',
+      { class: 'pick' },
+      icon(s.item.icon, s.item.name),
+      h(
+        'div',
+        { class: 'pick-body' },
+        h('div', { class: 'row' }, h('span', { class: 'iname' }, s.item.name), h('span', { class: 'free' }, 'gratuit')),
+        h(
+          'ul',
+          { class: 'why' },
+          h('li', { class: 'boost' }, 'À choisir maintenant dans la boutique'),
+          s.note ? h('li', null, s.note) : null,
+          s.item.passive ? h('li', { class: 'hide-compact' }, s.item.passive.text) : null,
+        ),
+      ),
+    ),
+    s.options.length
+      ? h('div', { class: 'supalts hide-compact' }, h('span', { class: 't' }, 'Sinon'), s.options.map((o) => h('span', { class: 'supalt' }, icon(o.icon, o.name), h('span', { class: 'n' }, `${o.name} · ${o.share}`))))
+      : null,
+  );
+}
+
+/** Build complet : 6 cases (bottes + 5 objets, ou objet de support + bottes + 4 objets), objets possédés cochés. */
 function fullSection(vm) {
   const items = vm.full && vm.full.length ? vm.full : vm.core;
   if (!items.length) return null;
   const why = items.filter((it) => it.situational && it.reason);
+  const sup = vm.support && vm.support.state === 'plan' ? vm.support : null;
   return h(
     'div',
     { class: 'sec hide-compact' },
@@ -281,13 +331,20 @@ function fullSection(vm) {
       items.map((it) =>
         h(
           'div',
-          { class: `slot ${it.owned ? 'owned' : ''} ${it.situational ? 'situ' : ''}`, title: it.reason || it.name },
+          { class: `slot ${it.owned ? 'owned' : ''} ${it.situational ? 'situ' : ''} ${it.support ? 'sup' : ''} ${it.choose ? 'choose' : ''}`, title: it.reason || it.name },
           icon(it.icon, it.name),
-          it.owned ? h('span', { class: 'check' }, '✓') : it.situational ? h('span', { class: 'flag' }, '!') : null,
+          it.owned ? h('span', { class: 'check' }, '✓') : it.situational || it.choose ? h('span', { class: 'flag' }, '!') : null,
         ),
       ),
     ),
-    why.length ? h('div', { class: 'why' }, why.map((it) => h('div', null, h('b', null, `${it.name} : `), it.reason))) : null,
+    why.length || sup
+      ? h(
+          'div',
+          { class: 'why' },
+          sup ? h('div', null, h('b', { class: 'supname' }, `${sup.item.name} : `), `objet de support à prendre en fin de quête · ${sup.note}`) : null,
+          why.map((it) => h('div', null, h('b', null, `${it.name} : `), it.reason)),
+        )
+      : null,
   );
 }
 
@@ -298,8 +355,13 @@ function goalSection(vm) {
   return h(
     'div',
     { class: `goal ${g.state}` },
-    h('div', { class: 'goal-line' }, h('span', { class: 'gt' }, g.title), h('span', { class: 'gv' }, g.value), h('span', { class: 'gs' }, g.text)),
-    h('div', { class: 'goal-bar' }, h('span', { style: { width: `${Math.round((g.progress || 0) * 100)}%` } })),
+    mascotEl(GOAL_MOOD[g.state] || 'focus'),
+    h(
+      'div',
+      { class: 'goal-main' },
+      h('div', { class: 'goal-line' }, h('span', { class: 'gt' }, g.title), h('span', { class: 'gv' }, g.value), h('span', { class: 'gs' }, g.text)),
+      h('div', { class: 'goal-bar' }, h('span', { style: { width: `${Math.round((g.progress || 0) * 100)}%` } })),
+    ),
   );
 }
 
@@ -310,6 +372,7 @@ function renderIngame(vm) {
       h('div', { class: 'right' }, h('div', { class: 'goldpill' }, h('span', { class: 'coin' }), vm.header.gold), h('div', { class: 'clock' }, vm.header.clock)),
     ),
     goalSection(vm),
+    supportSection(vm),
     startersSection(vm),
     enemiesSection(vm),
     optionsSection(vm),
@@ -394,8 +457,19 @@ function renderChampSelect(vm) {
       )
     : h('div');
   if (vm.spells || vm.start) out.push(h('div', { class: 'sec grid2' }, spells, start));
-  if (vm.core.length) out.push(h('div', { class: 'sec hide-compact' }, label(vm.coreTitle || 'Build type'), pathRow(vm.core, vm.boots)));
-  const first = vm.skills && vm.skills.first.length ? [h('span', { class: 't', style: { marginLeft: '8px' } }, 'Début'), vm.skills.first.map((k) => h('span', { class: 'kc small' }, k))] : null;
+  if (vm.core.length) {
+    const sup = vm.support;
+    out.push(
+      h(
+        'div',
+        { class: 'sec hide-compact' },
+        label(vm.coreTitle || 'Build type'),
+        pathRow(sup ? [sup.item, ...vm.core] : vm.core, vm.boots),
+        sup ? h('div', { class: 'why' }, h('div', null, h('b', { class: 'supname' }, `${sup.item.name} : `), `objet de support à prendre en fin de quête · ${sup.note}`)) : null,
+      ),
+    );
+  }
+  const first = vm.skills && vm.skills.first.length ? [h('span', { class: 't first' }, 'Début'), vm.skills.first.map((k) => h('span', { class: 'kc small' }, k))] : null;
   out.push(footer(vm, first));
   if (vm.runes) {
     // runes automatiques : état + raccourci pour (ré)appliquer à la main
@@ -414,7 +488,8 @@ function renderChampSelect(vm) {
 }
 
 function renderMessage(vm) {
-  return [h('div', { class: 'msg' }, h('div', { class: 'msg-title' }, vm.title), h('div', { class: 'msg-text' }, vm.text))];
+  const moving = document.body.classList.contains('move');
+  return [h('div', { class: 'msg' }, mascotEl(moving ? 'happy' : 'idle', 38), h('div', null, h('div', { class: 'msg-title' }, vm.title), h('div', { class: 'msg-text' }, vm.text)))];
 }
 
 // ------------------------------------------------------------ cycle de vie
@@ -442,7 +517,7 @@ function showToast({ text, level }) {
 function applySettings(s) {
   document.documentElement.style.setProperty('--opacity', String(s.opacity ?? 0.95));
   document.body.classList.toggle('compact', !!s.compact);
-  document.documentElement.dataset.accent = s.accent || 'cyan';
+  document.documentElement.dataset.accent = s.accent || 'stonks';
   document.body.classList.toggle('move', !!s.moveMode);
   const banner = $('#move-banner');
   banner.hidden = !s.moveMode;

@@ -9,7 +9,7 @@ const DEFAULT_LEAGUE_PATH =
     : 'C:\\Riot Games\\League of Legends';
 
 const DEFAULTS = {
-  configVersion: 2,
+  configVersion: 3,
   apiKey: '',
   platform: 'euw1',
   // langue des noms (objets, champions, runes) : 'auto' = celle du client LoL
@@ -34,12 +34,12 @@ const DEFAULTS = {
   followed: [],
   // en sélection : applique la page de runes recommandée (remplace la page active)
   autoRunes: true,
-  // en sélection : écrit une page d'objets BuildSense dans la boutique (meilleur départ en premier)
+  // en sélection : écrit une page d'objets Stonks dans la boutique (meilleur départ en premier)
   autoItemSet: true,
   // fenêtre principale : bascule sur la page "En direct" au début de chaque sélection/partie
   autoLivePage: true,
   // apparence : thème 'auto' (comme Windows) | 'light' | 'dark', accent ou 'classic' (DA de LoL)
-  appearance: { theme: 'dark', accent: 'cyan' },
+  appearance: { theme: 'dark', accent: 'stonks' },
   // mises à jour : téléchargées en fond (jamais pendant une partie), installées sur ton clic
   autoUpdate: true,
   updateRepo: '', // dépôt GitHub des versions, "pseudo/nom" ('' = celui de package.json)
@@ -97,6 +97,12 @@ class Config {
     if (saved && Object.keys(saved).length && !saved.configVersion) {
       if (saved.language === 'fr_FR') saved.language = 'auto';
       saved.configVersion = 2;
+    }
+    // v3 : BuildSense devient Stonks. La nouvelle identité arrive avec sa couleur (le dégradé « Stonks ») ;
+    // l'ancienne couleur reste disponible dans Réglages › Apparence. Fait une seule fois.
+    if (saved && Object.keys(saved).length && saved.configVersion < 3) {
+      if (isPlainObject(saved.appearance)) saved.appearance = { ...saved.appearance, accent: 'stonks' };
+      saved.configVersion = 3;
     }
     this.data = deepMerge(DEFAULTS, saved);
     if (!this.data.apiKey && process.env.RIOT_API_KEY) this.data.apiKey = process.env.RIOT_API_KEY.trim();

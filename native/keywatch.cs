@@ -1,4 +1,4 @@
-// BuildSense keywatch : détecte les raccourcis de BuildSense quand le jeu est au premier plan.
+// Stonks keywatch : détecte les raccourcis de Stonks quand le jeu est au premier plan.
 //
 // Le jeu (League of Legends) bloque les raccourcis globaux classiques de Windows (RegisterHotKey)
 // tant qu'il a le focus. Ce petit programme lit seulement l'état des touches (GetAsyncKeyState),
@@ -45,7 +45,7 @@ class KeyWatch
             if (!int.TryParse(p[5], out vk) || vk <= 0 || vk > 254) continue;
             next.Add(new Combo { Name = p[0], Ctrl = p[1] == "1", Shift = p[2] == "1", Alt = p[3] == "1", Win = p[4] == "1", Vk = vk });
         }
-        Environment.Exit(0); // BuildSense fermé : on s'arrête aussi
+        Environment.Exit(0); // Stonks fermé : on s'arrête aussi
     }
 
     static void Main()

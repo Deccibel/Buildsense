@@ -1,9 +1,9 @@
 {
-  "name": "buildsense",
-  "productName": "BuildSense",
-  "version": "1.8.0",
-  "description": "Overlay de builds pour League of Legends basé sur les parties des meilleurs joueurs (API officielles Riot uniquement).",
-  "author": "BuildSense",
+  "name": "stonks",
+  "productName": "Stonks",
+  "version": "2.0.0",
+  "description": "Coach et overlay de builds pour League of Legends, basé sur les parties des meilleurs joueurs (API officielles Riot uniquement).",
+  "author": "Stonks",
   "main": "src/main.js",
   "private": true,
   "scripts": {
@@ -20,9 +20,10 @@
     "@electron/packager": "^20.3.0",
     "electron": "^45.1.0"
   },
-  "buildsense": {
+  "stonks": {
     "repo": "Deccibel/buildsense",
     "channel": "beta",
-    "betaName": "PG-20261115-b1"
+    "betaName": "PG-20261115-b2",
+    "promote": false
   }
 }

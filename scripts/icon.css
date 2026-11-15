@@ -1,0 +1,40 @@
+/* Rendu de l'icône de l'appli (scripts/make-icons.js) : la mascotte seule, sur fond transparent. */
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* un peu de marge autour de la bille pour son ombre colorée */
+#stage .mascot {
+  margin-top: -3%;
+}
+
+/* ombre courte : elle doit tenir dans le carré de l'icône (pas de bord coupé) */
+#stage .mascot .m-body {
+  box-shadow:
+    0 calc(var(--ms) * 0.04) calc(var(--ms) * 0.08) calc(var(--ms) * -0.03) rgba(52, 36, 150, 0.55),
+    0 calc(var(--ms) * 0.012) calc(var(--ms) * 0.03) rgba(4, 8, 30, 0.3);
+}
+
+/* planche de contrôle (?sheet=1) */
+body.sheet {
+  background: #0b0d14;
+}
+body.sheet #stage {
+  gap: 3%;
+}
+body.sheet #stage .mascot {
+  margin-top: 0;
+}

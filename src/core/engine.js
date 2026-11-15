@@ -70,7 +70,7 @@ function computeIngame({ dd, store, rec, game, hasKey, mode = null, roleChoice =
   mode = mode || detectMode({ gameMode: game.gameMode, mapNumber: game.mapNumber, queueId: game.queueId });
   if (!mode.supported) return messageVM(mode.label || 'Mode non pris en charge', mode.message || 'Ce mode n’est pas pris en charge.');
   const champ = game.me.champ;
-  if (!champ) return messageVM('Champion inconnu', "Données du jeu pas encore à jour : relance BuildSense après la mise à jour du patch.");
+  if (!champ) return messageVM('Champion inconnu', "Données du jeu pas encore à jour : relance Stonks après la mise à jour du patch.");
   const picked = mode.roles ? resolveRole({ choice: roleChoice, champKey: champ.key, assigned: game.me.position, store }) : { role: '', source: '' };
   const role = picked.role;
   const opponent = mode.roles ? findOpponent(game, role, store) : null;
@@ -157,6 +157,7 @@ function computeChampSelect({ dd, store, rec, cs, hasKey, importHotkey, mode = n
     starts: result.starts.map((s) => ({ ids: s.ids, share: s.share })),
     core: result.core ? result.core.ids : [],
     boots: result.boots ? result.boots.id : 0,
+    support: result.support ? result.support.options.slice(0, 2).map((o) => o.id) : [],
   };
   vm.modeLabel = mode.label;
   return vm;

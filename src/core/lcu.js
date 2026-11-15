@@ -7,13 +7,17 @@ const { execFile } = require('child_process');
 const { agent } = require('./liveClient');
 
 const ROLE_MAP = { top: 'TOP', jungle: 'JUNGLE', middle: 'MIDDLE', bottom: 'BOTTOM', utility: 'UTILITY' };
-const PAGE_PREFIX = 'BuildSense';
-const SHORT_PREFIX = 'BS';
+const PAGE_PREFIX = 'Stonks';
+const SHORT_PREFIX = 'ST';
+// pages créées avant le changement de nom (BuildSense) : toujours reconnues comme les nôtres
+const LEGACY_PREFIXES = ['BuildSense', 'BS · '];
+const SET_PREFIX = 'stonks-';
+const LEGACY_SET_PREFIX = 'buildsense-';
 const PAGE_NAME_MAX = 25; // longueur maximale d'un nom de page dans le client
 
 /**
- * Nom de page lisible dans la limite du client : "BuildSense · Ahri Mid", sinon "BS · Nunu et Willump Support",
- * sinon le nom du champion est raccourci pour garder le poste ("BS · Nunu et Will… Support").
+ * Nom de page lisible dans la limite du client : "Stonks · Ahri Mid", sinon "ST · Nunu et Willump Support",
+ * sinon le nom du champion est raccourci pour garder le poste ("ST · Nunu et Will… Support").
  */
 function pageName(champion, role = '') {
   const label = `${champion}${role ? ` ${role}` : ''}`.trim();
@@ -25,7 +29,8 @@ function pageName(champion, role = '') {
   return `${SHORT_PREFIX} · ${champion.slice(0, Math.max(1, room)).trim()}…${role ? ` ${role}` : ''}`;
 }
 
-const isOurPage = (p) => typeof p.name === 'string' && (p.name.startsWith(PAGE_PREFIX) || p.name.startsWith(`${SHORT_PREFIX} · `));
+const isOurPage = (p) =>
+  typeof p.name === 'string' && (p.name.startsWith(PAGE_PREFIX) || p.name.startsWith(`${SHORT_PREFIX} · `) || LEGACY_PREFIXES.some((x) => p.name.startsWith(x)));
 
 /**
  * Client du League Client (LCU) : sert uniquement à lire la sélection des champions
@@ -165,7 +170,7 @@ class LcuClient {
 
   /**
    * Page d'objets dans la boutique du jeu (onglet "Recommandés" : liste déroulante des pages d'objets).
-   * Une seule page BuildSense par champion ; les pages créées par le joueur ne sont jamais touchées.
+   * Une seule page Stonks par champion ; les pages créées par le joueur ne sont jamais touchées.
    * @param {{ title: string, champKey: number, map: number, blocks: { type: string, items: { id: number, count: number }[] }[] }} set
    */
   async writeItemSet(set) {
@@ -175,9 +180,10 @@ class LcuClient {
     const cur = await this.request('GET', path);
     if (!cur.ok) return { ok: false, message: 'Pages d’objets illisibles.' };
     const data = cur.data && typeof cur.data === 'object' ? cur.data : {};
-    const others = (Array.isArray(data.itemSets) ? data.itemSets : []).filter((s) => !String(s.uid || '').startsWith('buildsense-'));
+    const isOurs = (s) => String(s.uid || '').startsWith(SET_PREFIX) || String(s.uid || '').startsWith(LEGACY_SET_PREFIX);
+    const others = (Array.isArray(data.itemSets) ? data.itemSets : []).filter((s) => !isOurs(s));
     const ours = {
-      uid: `buildsense-${set.champKey}`,
+      uid: `${SET_PREFIX}${set.champKey}`,
       title: set.title.slice(0, 75),
       type: 'custom',
       map: 'any',
@@ -203,7 +209,7 @@ class LcuClient {
 
   /**
    * Applique une page de runes en REMPLAÇANT la page active (si elle est modifiable),
-   * sinon une page BuildSense existante, sinon une nouvelle page.
+   * sinon une page Stonks existante, sinon une nouvelle page.
    * Aucune page n'est jamais supprimée en plus de celle qu'on remplace.
    * @param {{ primaryStyleId:number, subStyleId:number, selectedPerkIds:number[] }} page
    */

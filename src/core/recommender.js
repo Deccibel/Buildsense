@@ -220,6 +220,8 @@ class Recommender {
       mainClass,
       tankShare: shares.TANK,
       apShare: shares.AP,
+      // build de support : l'objet de support occupe une case (objet de support + bottes + 4 objets)
+      supportBuild: F.id === 'sr' && wanted === 'UTILITY' && !!this.dd.support,
     };
     if (this.profiles.size > 300) this.profiles.clear();
     this.profiles.set(ck, prof);
@@ -315,14 +317,20 @@ class Recommender {
     return list[0] || null;
   }
 
+  /** Nombre d'objets du "coeur" de build : 3, ou 2 pour les supports (ils finissent rarement un 3e objet). */
+  coreSize(prof) {
+    return prof.supportBuild ? 2 : 3;
+  }
+
   coreBuild(prof, liveFeat, oppKey, preset = null) {
+    const want = this.coreSize(prof);
     const by3 = new Map();
     const by2 = new Map();
     for (const r of prof.recs) {
-      const s = this.legendarySeq(r).slice(0, 3);
+      const s = this.legendarySeq(r).slice(0, want);
       if (s.length < 2) continue;
       const w = this.recordWeight(r, liveFeat, oppKey, prof, preset);
-      addTo(s.length === 3 ? by3 : by2, s.join(','), w, r.w);
+      addTo(s.length === want ? by3 : by2, s.join(','), w, r.w);
     }
     const pick = (m) => {
       let best = null;
@@ -332,6 +340,162 @@ class Recommender {
     const best = by3.size ? pick(by3) : pick(by2);
     if (!best) return null;
     return { ids: best.k.split(',').map(Number), n: best.v.n, wr: smoothWr(best.v) };
+  }
+
+  /**
+   * Évolution de l'objet de support à privilégier (choix gratuit en fin de quête) :
+   * celle que prennent les meilleurs joueurs de ce champion en support, dans des parties similaires.
+   * Champion rarement joué support : on s'appuie aussi sur les supports du même style (mage, tank, AD, enchanteur).
+   * @returns {{ options: {id:number, share:number, wr:number, n:number}[], n:number, generic:boolean } | null}
+   */
+  supportChoice(prof, liveFeat = null, oppKey = 0) {
+    const sup = this.dd.support;
+    if (!sup || !prof.supportBuild) return null;
+    const leaves = new Set(sup.upgrades);
+    const leafOf = (r) => (r.fi || []).find((id) => leaves.has(id)) || 0;
+    const counts = new Map();
+    let total = 0;
+    let n = 0;
+    for (const r of prof.recs) {
+      if (r.r !== 'UTILITY') continue;
+      const id = leafOf(r);
+      if (!id) continue;
+      const w = this.recordWeight(r, liveFeat, oppKey, prof);
+      addTo(counts, id, w, r.w);
+      total += w;
+      n++;
+    }
+    let generic = false;
+    if (n < 12) {
+      // peu de parties de ce champion en support : supports du même style, ses propres parties comptant davantage
+      const near = this.supportSimilarity(prof);
+      const all = this.store.byRole('UTILITY');
+      const step = Math.max(1, Math.floor(all.length / 6000));
+      const own = [...counts.entries()];
+      counts.clear();
+      let gTotal = 0;
+      let gN = 0;
+      for (let i = 0; i < all.length; i += step) {
+        const r = all[i];
+        const sim = near(r.c);
+        if (sim < 0.1) continue;
+        const id = leafOf(r);
+        if (!id) continue;
+        const w = this.patchWeight(r.v) * sim * sim;
+        addTo(counts, id, w, r.w);
+        gTotal += w;
+        gN++;
+      }
+      if (gN >= 8) {
+        generic = true;
+        // les parties du champion lui-même pèsent d'autant plus qu'elles sont nombreuses (la moitié du total vers 12 parties)
+        const boost = total ? (gTotal * (n / 12)) / total : 0;
+        for (const [id, v] of own) {
+          const c = counts.get(id) || { w: 0, win: 0, n: 0 };
+          c.w += v.w * boost;
+          c.win += v.win * boost;
+          c.n += v.n;
+          counts.set(id, c);
+        }
+        total = gTotal + total * boost;
+        n += gN;
+      } else {
+        counts.clear();
+        for (const [id, v] of own) counts.set(id, v);
+      }
+    }
+    if (!counts.size) return null;
+    const options = [...counts.entries()]
+      .map(([id, v]) => ({ id, share: v.w / (total || 1), wr: smoothWr(v, 3), n: v.n }))
+      .sort((a, b) => b.share - a.share)
+      .slice(0, 3);
+    return { options, n, generic };
+  }
+
+  /**
+   * Objets construits par chaque champion joué en support (fréquences), et son style (AD, AP, TANK, SUPPORT).
+   * Sert à trouver les supports « qui se construisent comme » un champion rarement joué à ce poste :
+   * un mage support n'a pas le même objet de support qu'un tank ou un enchanteur.
+   */
+  supportProfiles() {
+    if (this.supProfiles && this.supProfiles.version === this.store.version) return this.supProfiles.map;
+    const map = new Map();
+    for (const r of this.store.byRole('UTILITY')) {
+      let a = map.get(r.c);
+      if (!a) map.set(r.c, (a = { items: new Map(), AD: 0, AP: 0, TANK: 0, SUPPORT: 0, n: 0, cls: null }));
+      for (const id of r.fi || []) {
+        const it = this.dd.item(id);
+        if (!it || !it.isLegendary) continue;
+        a.items.set(id, (a.items.get(id) || 0) + 1);
+        if (it.cls === 'HYBRID') {
+          a.AD += 0.5;
+          a.AP += 0.5;
+        } else if (a[it.cls] !== undefined) a[it.cls]++;
+        a.n++;
+      }
+    }
+    for (const [c, a] of map) a.cls = a.n >= 10 ? ['AD', 'AP', 'TANK', 'SUPPORT'].sort((x, y) => a[y] - a[x])[0] : guessClass(this.dd.champion(c));
+    this.supProfiles = { version: this.store.version, map };
+    return map;
+  }
+
+  /**
+   * Ressemblance (0 à 1) entre le build habituel d'un champion et celui de chaque champion joué en support.
+   * Sans données sur le champion : même style (classe) ou non.
+   */
+  supportSimilarity(prof) {
+    const profiles = this.supportProfiles();
+    const mine = prof.itemFreq;
+    let norm = 0;
+    for (const v of mine.values()) norm += v * v;
+    const cache = new Map();
+    return (champKey) => {
+      if (cache.has(champKey)) return cache.get(champKey);
+      const other = profiles.get(champKey);
+      let sim = 0;
+      if (other) {
+        if (mine.size >= 3 && other.items.size >= 3) {
+          let dot = 0;
+          let on = 0;
+          for (const [id, v] of other.items) {
+            on += v * v;
+            dot += v * (mine.get(id) || 0);
+          }
+          sim = norm && on ? dot / Math.sqrt(norm * on) : 0;
+        } else sim = other.cls === prof.mainClass ? 0.5 : 0;
+      }
+      cache.set(champKey, sim);
+      return sim;
+    };
+  }
+
+  /** Profil moyen des compos adverses d'un groupe de parties (pour dire "quand" un choix est préféré). */
+  compAverage(recs) {
+    const acc = { ap: 0, heal: 0, tank: 0, cc: 0, n: 0 };
+    for (const r of recs) {
+      if (!r.e || r.e.length < 3) continue;
+      const f = this.featuresFor(r.e);
+      acc.ap += f.ap;
+      acc.heal += f.heal;
+      acc.tank += f.tank;
+      acc.cc += f.cc;
+      acc.n++;
+    }
+    if (!acc.n) return null;
+    return { ap: acc.ap / acc.n, heal: acc.heal / acc.n, tank: acc.tank / acc.n, cc: acc.cc / acc.n, n: acc.n };
+  }
+
+  /** Dans quelles parties ce choix est préféré, par rapport au choix principal. */
+  compContext(alt, base) {
+    if (!alt || !base || alt.n < 5) return [];
+    const out = [];
+    const d = (k) => alt[k] - base[k];
+    if (d('ap') > 0.07) out.push('contre plus de dégâts magiques');
+    if (d('ap') < -0.07) out.push('contre plus de dégâts physiques');
+    if (d('heal') > 0.35) out.push('contre beaucoup de soins');
+    if (d('tank') > 0.35) out.push('contre des équipes plus résistantes (tanks)');
+    if (d('cc') > 0.4) out.push('contre beaucoup de contrôles');
+    return out;
   }
 
   skillOrder(prof) {
@@ -477,6 +641,11 @@ class Recommender {
       return !it || owned.has(id) || !available(id) || (it.group && ownedGroups.has(it.group));
     };
     const liveFeat = enemyKeys.length ? this.featuresFor(enemyKeys) : null;
+    // build de support : au poste de support, ou dès qu'un objet de support est dans l'inventaire
+    const sup = dd.support;
+    const ownedSupport = sup && !noBoots ? [...owned].find((id) => sup.all.has(id)) || 0 : 0;
+    const supportBuild = !noBoots && (prof.supportBuild || !!ownedSupport);
+    const slots = noBoots ? 6 : supportBuild ? 4 : 5;
 
     const cand = new Map();
     let totalW = 0;
@@ -542,8 +711,19 @@ class Recommender {
       return it && it.isBoots;
     });
     const full = prof.n
-      ? this.completeBuild({ prof, ownedLeg, available, liveFeat, oppKey, boosts: needs.boosts || [], preset, map: dd.hasMap(itemMap) ? itemMap : prof.map, slots: noBoots ? 6 : 5 })
+      ? this.completeBuild({ prof, ownedLeg, available, liveFeat, oppKey, boosts: needs.boosts || [], preset, map: dd.hasMap(itemMap) ? itemMap : prof.map, slots })
       : [];
+    let support = null;
+    if (supportBuild) {
+      const sprof = prof.supportBuild ? prof : this.profile(champKey, 'UTILITY', 'sr');
+      const choice = this.supportChoice(sprof, liveFeat, oppKey);
+      support = {
+        stage: ownedSupport ? dd.supportStage(ownedSupport) : 'none',
+        owned: ownedSupport,
+        options: choice ? choice.options : [],
+        generic: !!(choice && choice.generic),
+      };
+    }
 
     return {
       family: prof.family,
@@ -554,6 +734,7 @@ class Recommender {
       plan,
       core: core && core.ids.length ? core : null,
       full: full.length ? { items: full, boots: noBoots ? null : ownedBoots ? { id: ownedBoots, owned: true } : boots ? { id: boots.id, owned: false } : null } : null,
+      support,
       skills: this.skillOrder(prof),
       n: prof.n,
       nAll: prof.nAll,
@@ -561,12 +742,12 @@ class Recommender {
       offRole: prof.offRole,
       nRole: prof.nRole,
       mainClass: prof.mainClass,
-      fullInventory: ownedLeg.length >= 5,
+      fullInventory: ownedLeg.length >= (supportBuild ? 4 : 5),
     };
   }
 
   /** Résumé d'un groupe de parties : 5 légendaires, bottes, rune principale, victoires. */
-  summarize(recs, core = []) {
+  summarize(recs, core = [], slots = 5) {
     const dd = this.dd;
     const pos = [new Map(), new Map(), new Map(), new Map(), new Map()];
     const boots = new Map();
@@ -580,8 +761,8 @@ class Recommender {
       if (r.ru && r.ru[1]) keys.set(r.ru[1], (keys.get(r.ru[1]) || 0) + 1);
       wins += r.w ? 1 : 0;
     }
-    const items = core.slice(0, 5);
-    for (let i = items.length; i < 5; i++) {
+    const items = core.slice(0, slots);
+    for (let i = items.length; i < slots; i++) {
       const best = [...pos[i].entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id).find((id) => !items.includes(id));
       // repli : objet fréquent à une autre position
       const any = best || [...pos.flatMap((m) => [...m.entries()])].sort((a, b) => b[1] - a[1]).map(([id]) => id).find((id) => !items.includes(id));
@@ -601,33 +782,47 @@ class Recommender {
     const groups = this.variantGroups(prof);
     const total = [...groups.values()].reduce((s, g) => s + g.length, 0) || 1;
     const noBoots = NO_BOOTS.has(family);
+    const slots = prof.supportBuild ? 4 : 5;
     const out = [...groups.entries()]
       .filter(([, g]) => g.length >= 3)
       .sort((a, b) => b[1].length - a[1].length)
       .slice(0, 5)
       .map(([k, g], i) => {
-        const sum = this.summarize(g, k.split(',').map(Number));
+        const sum = this.summarize(g, k.split(',').map(Number), slots);
         if (noBoots) sum.boots = 0;
-        return { id: `core:${k}`, source: 'data', rank: i + 1, share: g.length / total, players: this.topPlayers(g, 2), ...sum };
+        return { id: `core:${k}`, source: 'data', rank: i + 1, share: g.length / total, players: this.topPlayers(g, 2), support: this.topSupport(prof, g), ...sum };
       });
     if (family === 'sr') {
       const all = this.store.byChampion(Number(champKey), 'sr');
       for (const f of followed) {
         const g = this.followedRecs(all, f.id, prof.role);
         if (!g.length) continue;
-        out.push({ id: `player:${f.id}`, source: 'player', player: f.name, share: null, players: [], ...this.summarize(g) });
+        out.push({ id: `player:${f.id}`, source: 'player', player: f.name, share: null, players: [], support: this.topSupport(prof, g), ...this.summarize(g, [], slots) });
       }
     }
-    return { role: prof.role, mainRole: prof.mainRole, n: prof.n, family: prof.family, dataFamily: prof.dataFamily, variants: out };
+    return { role: prof.role, mainRole: prof.mainRole, n: prof.n, family: prof.family, dataFamily: prof.dataFamily, supportBuild: prof.supportBuild, variants: out };
   }
 
-  /** Parties regroupées par chemin d'objets (3 premiers objets légendaires). */
+  /** Évolution de l'objet de support la plus prise dans un groupe de parties (0 si ce n'est pas un build de support). */
+  topSupport(prof, recs) {
+    const sup = this.dd.support;
+    if (!sup || !prof.supportBuild) return 0;
+    const counts = new Map();
+    for (const r of recs) {
+      const id = (r.fi || []).find((x) => sup.upgrades.includes(x));
+      if (id) counts.set(id, (counts.get(id) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id)[0] || 0;
+  }
+
+  /** Parties regroupées par chemin d'objets (3 premiers objets légendaires, 2 pour les supports). */
   variantGroups(prof) {
     const groups = new Map();
+    const size = this.coreSize(prof);
     for (const r of prof.recs) {
       const seq = this.legendarySeq(r);
-      if (seq.length < 3) continue;
-      const k = seq.slice(0, 3).join(',');
+      if (seq.length < size) continue;
+      const k = seq.slice(0, size).join(',');
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     }
@@ -671,40 +866,18 @@ class Recommender {
     }
     if (!g.length) return null;
     const dd = this.dd;
-    const sum = this.summarize(g, core);
+    const slotCount = prof.supportBuild ? 4 : 5;
+    const sum = this.summarize(g, core, slotCount);
     const noBoots = NO_BOOTS.has(family);
     const minuteOf = (r, id) => {
       const x = (r.co || []).find((c) => c[0] === id);
       return x && x[1] > 0 ? x[1] : null;
     };
-    const feats = (recs) => {
-      const acc = { ap: 0, heal: 0, tank: 0, cc: 0, n: 0 };
-      for (const r of recs) {
-        if (!r.e || r.e.length < 3) continue;
-        const f = this.featuresFor(r.e);
-        acc.ap += f.ap;
-        acc.heal += f.heal;
-        acc.tank += f.tank;
-        acc.cc += f.cc;
-        acc.n++;
-      }
-      if (!acc.n) return null;
-      return { ap: acc.ap / acc.n, heal: acc.heal / acc.n, tank: acc.tank / acc.n, cc: acc.cc / acc.n, n: acc.n };
-    };
-    const contextOf = (alt, base) => {
-      if (!alt || !base || alt.n < 5) return [];
-      const out = [];
-      const d = (k) => alt[k] - base[k];
-      if (d('ap') > 0.07) out.push('contre plus de dégâts magiques');
-      if (d('ap') < -0.07) out.push('contre plus de dégâts physiques');
-      if (d('heal') > 0.35) out.push('contre beaucoup de soins');
-      if (d('tank') > 0.35) out.push('contre des équipes plus résistantes (tanks)');
-      if (d('cc') > 0.4) out.push('contre beaucoup de contrôles');
-      return out;
-    };
+    const feats = (recs) => this.compAverage(recs);
+    const contextOf = (alt, base) => this.compContext(alt, base);
     // case par case : objet du build et alternatives (parties du champion avec les mêmes objets avant)
     const slots = [];
-    for (let i = 0; i < Math.min(5, sum.items.length); i++) {
+    for (let i = 0; i < Math.min(slotCount, sum.items.length); i++) {
       const id = sum.items[i];
       const has = g.filter((r) => this.legendarySeq(r).includes(id));
       const mins = has.map((r) => minuteOf(r, id)).filter((x) => x !== null);
@@ -757,11 +930,44 @@ class Recommender {
       : counts((r) => (r.co || []).map((x) => x[0]).find((id) => isBootsItem(dd, id)) || 0)
           .slice(0, 3)
           .map(([id, n]) => ({ ...this.itemBrief(Number(id)), share: n / g.length }));
+    // objet de support : évolutions prises avec ce build, et dans quelles parties
+    let support = null;
+    const sup = dd.support;
+    if (sup && prof.supportBuild) {
+      const by = new Map();
+      for (const r of g) {
+        const id = (r.fi || []).find((x) => sup.upgrades.includes(x));
+        if (!id) continue;
+        const l = by.get(id) || [];
+        l.push(r);
+        by.set(id, l);
+      }
+      let list = [...by.entries()].sort((x, y) => y[1].length - x[1].length);
+      const withLeaf = list.reduce((t, [, l]) => t + l.length, 0);
+      let generic = false;
+      if (withLeaf < 8) {
+        // trop peu de parties pour ce build précis : choix du champion à ce poste
+        const choice = this.supportChoice(prof);
+        list = choice ? choice.options.map((o) => [o.id, null, o]) : [];
+        generic = !!(choice && choice.generic);
+      }
+      const base = list[0] && list[0][1] ? feats(list[0][1]) : null;
+      const options = list.filter(([, l, o], i) => i === 0 || (l ? l.length / (withLeaf || 1) : o.share) >= 0.05).slice(0, 4).map(([id, l, o], i) => ({
+        ...this.itemBrief(id),
+        share: l ? l.length / (withLeaf || 1) : o.share,
+        wr: l ? smoothWr({ win: l.filter((r) => r.w).length, w: l.length }) : o.wr,
+        n: l ? l.length : o.n,
+        when: l && i > 0 ? contextOf(feats(l), base) : [],
+        passive: (dd.item(id) || {}).passive || null,
+      }));
+      if (options.length) support = { options, generic };
+    }
     return {
       n: g.length,
       wr: smoothWr({ win: g.filter((r) => r.w).length, w: g.length }),
       duration: median(g.map((r) => r.d).filter(Boolean)),
       slots,
+      support,
       boots,
       runes: page ? { ids: page[0].split(',').map(Number), share: page[1] / g.length } : null,
       spells: spells ? { ids: spells[0].split(',').map(Number), share: spells[1] / g.length } : null,
@@ -879,6 +1085,7 @@ class Recommender {
       skills: this.skillOrder(prof),
       core: this.coreBuild(prof, liveFeat, oppKey, preset),
       boots: NO_BOOTS.has(family) ? null : this.bootsChoice(prof, liveFeat, oppKey, []),
+      support: this.supportChoice(prof, liveFeat, oppKey),
     };
   }
 }

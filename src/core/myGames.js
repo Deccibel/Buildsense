@@ -310,7 +310,7 @@ function liveGoal(goal, live) {
   const base = { id: goal.id, title: goal.short };
   if (goal.id === 'cs10') {
     if (t >= 600) {
-      // BuildSense lancé après 10 min : la valeur exacte viendra du bilan d'après-partie
+      // Stonks lancé après 10 min : la valeur exacte viendra du bilan d'après-partie
       if (live.cs10 === null || live.cs10 === undefined) return { ...base, value: `– / ${goal.target}`, state: 'wait', text: 'résultat dans ton bilan', progress: 0 };
       const v = live.cs10;
       const ok = v >= goal.target;

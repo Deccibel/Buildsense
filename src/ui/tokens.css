@@ -1,0 +1,187 @@
+/*
+ * Stonks : couleurs et polices communes à la fenêtre principale et à l'overlay.
+ *
+ * Chaque couleur d'accent est un dégradé (--a1 -> --a2 -> --a3, plus un reflet --a4) : c'est lui qui teinte
+ * le verre, les boutons et la mascotte. --accent est la teinte « texte » du dégradé.
+ */
+
+:root {
+  color-scheme: dark;
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+
+  /* accent par défaut : « Stonks » (menthe -> azur -> violet, reflet rose) */
+  --a1: #6ef3c5;
+  --a2: #3f9bff;
+  --a3: #8a5bff;
+  --a4: #ff6fd8;
+  --accent: #86b6ff;
+  --accent-rgb: 134, 182, 255;
+  --on-accent: #ffffff;
+  /* dégradé des boutons et interrupteurs (assez soutenu pour porter du texte) */
+  --b1: #3f9bff;
+  --b2: #8a5bff;
+
+  --gold: #f5c451;
+  --ad: #ff9f43;
+  --ap: #5aa9ff;
+  --danger: #ff5d6c;
+  --warn: #ffb547;
+  --ok: #3ddc84;
+  --danger-rgb: 255, 93, 108;
+  --warn-rgb: 255, 181, 71;
+  --ok-rgb: 61, 220, 132;
+  --ap-rgb: 90, 169, 255;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --accent: #3d5fe0;
+    --accent-rgb: 61, 95, 224;
+    --gold: #a86f10;
+    --ad: #c4610a;
+    --ap: #1f6bd1;
+    --danger: #d43347;
+    --warn: #b86e00;
+    --ok: #17914f;
+    --danger-rgb: 212, 51, 71;
+    --warn-rgb: 184, 110, 0;
+    --ok-rgb: 23, 145, 79;
+    --ap-rgb: 31, 107, 209;
+  }
+}
+
+:root[data-accent='cyan'] {
+  --b1: #2ee6c5;
+  --b2: #22b8e6;
+  --a1: #8ff7e4;
+  --a2: #2ee6c5;
+  --a3: #22b8e6;
+  --a4: #5b8cff;
+  --accent: #2ee6c5;
+  --accent-rgb: 46, 230, 197;
+  --on-accent: #04201b;
+}
+
+:root[data-accent='red'] {
+  --b1: #ff4d5e;
+  --b2: #d83a8c;
+  --a1: #ff9a6b;
+  --a2: #ff4d5e;
+  --a3: #d83a8c;
+  --a4: #a04bff;
+  --accent: #ff7584;
+  --accent-rgb: 255, 117, 132;
+  --on-accent: #ffffff;
+}
+
+:root[data-accent='green'] {
+  --b1: #3ddc84;
+  --b2: #17b8a0;
+  --a1: #c2f58a;
+  --a2: #3ddc84;
+  --a3: #17b8a0;
+  --a4: #2a9df4;
+  --accent: #3ddc84;
+  --accent-rgb: 61, 220, 132;
+  --on-accent: #04210f;
+}
+
+:root[data-accent='yellow'] {
+  --b1: #f5d142;
+  --b2: #ff9f43;
+  --a1: #fff08a;
+  --a2: #f5d142;
+  --a3: #ff9f43;
+  --a4: #ff6b6b;
+  --accent: #f5d142;
+  --accent-rgb: 245, 209, 66;
+  --on-accent: #1a1400;
+}
+
+:root[data-accent='orange'] {
+  --b1: #ffa94d;
+  --b2: #ff6b4a;
+  --a1: #ffd166;
+  --a2: #ff9a3c;
+  --a3: #ff5e62;
+  --a4: #c44dff;
+  --accent: #ffa94d;
+  --accent-rgb: 255, 169, 77;
+  --on-accent: #1f0f00;
+}
+
+:root[data-accent='purple'] {
+  --b1: #9a78ff;
+  --b2: #7c5cff;
+  --a1: #e0a3ff;
+  --a2: #b48cff;
+  --a3: #7c5cff;
+  --a4: #ff6fd8;
+  --accent: #b99cff;
+  --accent-rgb: 185, 156, 255;
+  --on-accent: #ffffff;
+}
+
+:root[data-accent='blue'] {
+  --b1: #4d9fff;
+  --b2: #4a6bff;
+  --a1: #7fd0ff;
+  --a2: #4d9fff;
+  --a3: #4a6bff;
+  --a4: #a06bff;
+  --accent: #6db0ff;
+  --accent-rgb: 109, 176, 255;
+  --on-accent: #ffffff;
+}
+
+/* Classique : or hextech sur bleu nuit (direction artistique de League of Legends) */
+:root[data-accent='classic'] {
+  --b1: #d8bd84;
+  --b2: #b08d4a;
+  --a1: #f0e6d2;
+  --a2: #c8aa6e;
+  --a3: #785a28;
+  --a4: #0ac8b9;
+  --accent: #c8aa6e;
+  --accent-rgb: 200, 170, 110;
+  --on-accent: #010a13;
+  --gold: #f0e6d2;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-accent='cyan'] {
+    --accent: #0e9a86;
+    --accent-rgb: 14, 154, 134;
+  }
+  :root[data-accent='red'] {
+    --accent: #d42a3c;
+    --accent-rgb: 212, 42, 60;
+  }
+  :root[data-accent='green'] {
+    --accent: #18924d;
+    --accent-rgb: 24, 146, 77;
+  }
+  :root[data-accent='yellow'] {
+    --accent: #8f7400;
+    --accent-rgb: 143, 116, 0;
+  }
+  :root[data-accent='orange'] {
+    --accent: #c4610a;
+    --accent-rgb: 196, 97, 10;
+  }
+  :root[data-accent='purple'] {
+    --accent: #7647d8;
+    --accent-rgb: 118, 71, 216;
+  }
+  :root[data-accent='blue'] {
+    --accent: #1f6bd1;
+    --accent-rgb: 31, 107, 209;
+  }
+  :root[data-accent='classic'] {
+    --accent: #8f6a1f;
+    --accent-rgb: 143, 106, 31;
+    --gold: #8f6a1f;
+  }
+}

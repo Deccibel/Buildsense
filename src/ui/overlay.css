@@ -1,168 +1,82 @@
+/*
+ * Stonks : overlay affiché par-dessus le jeu.
+ *
+ * Même matière « verre » que la fenêtre principale, en plus dense pour rester lisible sur le jeu :
+ * un panneau sombre teinté par le dégradé de l'accent, des cellules arrondies, un reflet sur l'arête du haut.
+ * Rien n'est animé en continu et aucun flou n'est calculé : l'overlay ne doit rien coûter pendant la partie.
+ * Le réglage d'opacité rend surtout le FOND transparent : le texte et les icônes restent nets.
+ * Les couleurs d'accent et les polices sont dans tokens.css.
+ */
+
 :root {
-  color-scheme: dark;
-  --bg: rgba(9, 12, 19, 0.94);
-  --side: #0d121b;
-  --chip-bg: #0a0d14;
+  --panel: 9 12 22;
+  --panel-2: 21 26 45;
+  --side: #10141f;
+  --chip-bg: #0c1020;
   --fg-rgb: 255, 255, 255;
-  --surface: rgba(var(--fg-rgb), 0.035);
-  --surface-2: rgba(var(--fg-rgb), 0.07);
-  --line: rgba(var(--fg-rgb), 0.07);
-  --text: #e8edf3;
-  --muted: #8a97a8;
-  --dim: #5d697a;
-  --accent: #2ee6c5;
-  --accent-rgb: 46, 230, 197;
+  --surface: rgba(var(--fg-rgb), 0.045);
+  --surface-2: rgba(var(--fg-rgb), 0.09);
+  --line: rgba(var(--fg-rgb), 0.08);
+  --edge: rgba(var(--fg-rgb), 0.14);
+  --hi: rgba(255, 255, 255, 0.16);
+  --text: #f2f5fb;
+  --muted: #9da9bd;
+  --dim: #6d7990;
   --accent-hi: color-mix(in srgb, var(--accent) 45%, #fff);
-  --accent-soft: rgba(var(--accent-rgb), 0.13);
-  --on-accent: #071311;
-  --gold: #f5c451;
-  --ad: #ff9f43;
-  --ap: #5aa9ff;
-  --danger: #ff5d6c;
-  --warn: #ffb547;
-  --ok: #3ddc84;
+  --accent-soft: rgba(var(--accent-rgb), 0.14);
+  --grad: linear-gradient(135deg, var(--b1), var(--b2));
+  --tint: 23%;
   --opacity: 0.95;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    color-scheme: light;
-    --bg: rgba(248, 250, 252, 0.95);
+    --panel: 240 243 250;
+    --panel-2: 252 253 255;
     --side: #ffffff;
     --chip-bg: #ffffff;
-    --fg-rgb: 15, 23, 42;
-    --text: #131a26;
-    --muted: #586374;
-    --dim: #6f7a8b;
-    --accent: #0e9a86;
-    --accent-rgb: 14, 154, 134;
-    --accent-hi: color-mix(in srgb, var(--accent) 70%, #000);
-    --on-accent: #ffffff;
-    --gold: #a86f10;
-    --ad: #c4610a;
-    --ap: #1f6bd1;
-    --danger: #d43347;
-    --warn: #b86e00;
-    --ok: #17914f;
-  }
-}
-
-:root[data-accent='cyan'] {
-  --accent: #2ee6c5;
-  --accent-rgb: 46, 230, 197;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='cyan'] {
-    --accent: #0e9a86;
-    --accent-rgb: 14, 154, 134;
-  }
-}
-
-:root[data-accent='red'] {
-  --accent: #ff4d5e;
-  --accent-rgb: 255, 77, 94;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='red'] {
-    --accent: #d42a3c;
-    --accent-rgb: 212, 42, 60;
-  }
-}
-
-:root[data-accent='green'] {
-  --accent: #3ddc84;
-  --accent-rgb: 61, 220, 132;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='green'] {
-    --accent: #18924d;
-    --accent-rgb: 24, 146, 77;
-  }
-}
-
-:root[data-accent='yellow'] {
-  --accent: #f5d142;
-  --accent-rgb: 245, 209, 66;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='yellow'] {
-    --accent: #9c7f00;
-    --accent-rgb: 156, 127, 0;
-  }
-}
-
-:root[data-accent='orange'] {
-  --accent: #ff9a3c;
-  --accent-rgb: 255, 154, 60;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='orange'] {
-    --accent: #cc6a0c;
-    --accent-rgb: 204, 106, 12;
-  }
-}
-
-:root[data-accent='purple'] {
-  --accent: #b48cff;
-  --accent-rgb: 180, 140, 255;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='purple'] {
-    --accent: #7647d8;
-    --accent-rgb: 118, 71, 216;
-  }
-}
-
-:root[data-accent='blue'] {
-  --accent: #4d9fff;
-  --accent-rgb: 77, 159, 255;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-accent='blue'] {
-    --accent: #1f6bd1;
-    --accent-rgb: 31, 107, 209;
+    --fg-rgb: 20, 30, 60;
+    --edge: rgba(var(--fg-rgb), 0.16);
+    --hi: rgba(255, 255, 255, 0.95);
+    --text: #121826;
+    --muted: #556074;
+    --dim: #76829a;
+    --accent-hi: color-mix(in srgb, var(--accent) 72%, #000);
+    --tint: 26%;
   }
 }
 
 :root[data-accent='classic'] {
-  --bg: rgba(1, 10, 19, 0.95);
+  --panel: 2 10 19;
+  --panel-2: 9 22 38;
   --side: #061220;
-  --chip-bg: #010a13;
+  --chip-bg: #020a13;
   --text: #f0e6d2;
-  --muted: #a09b8c;
-  --dim: #6b6a63;
-  --accent: #c8aa6e;
-  --accent-rgb: 200, 170, 110;
-  --on-accent: #010a13;
-  --gold: #f0e6d2;
+  --muted: #a8a290;
+  --dim: #77735f;
+  --tint: 13%;
 }
 
 @media (prefers-color-scheme: light) {
   :root[data-accent='classic'] {
-    --bg: rgba(244, 237, 222, 0.96);
+    --panel: 239 230 211;
+    --panel-2: 251 247 238;
     --side: #f7f0e1;
     --chip-bg: #fbf7ee;
     --fg-rgb: 30, 35, 40;
     --text: #1e2328;
     --muted: #5f5a4f;
-    --dim: #8f8877;
-    --accent: #8f6a1f;
-    --accent-rgb: 143, 106, 31;
-    --on-accent: #fbf7ee;
-    --gold: #8f6a1f;
+    --dim: #8a8370;
+    --tint: 22%;
   }
 }
 
-
 * {
   box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 html,
@@ -176,33 +90,43 @@ body {
 }
 
 body {
-  font: 12.5px/1.35 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  font: 12.5px/1.35 var(--font);
   color: var(--text);
   width: 340px;
 }
 
+/* aperçus de développement : un fond qui ressemble à une partie */
 body.preview {
-  background: radial-gradient(circle at 25% 15%, #23352c, #121a16 55%, #0b0f0d);
+  background: radial-gradient(circle at 25% 15%, #2c4636, #16221b 55%, #0b0f0d);
   padding: 14px;
   width: auto;
 }
 
 .panel {
+  /* le fond suit le réglage d'opacité ; le contenu ne s'estompe qu'aux valeurs les plus basses */
+  --bg-a: calc(var(--opacity) * 0.98);
   position: relative;
   width: 340px;
-  background: var(--bg);
-  border: 1px solid rgba(var(--fg-rgb), 0.08);
-  border-radius: 14px;
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  background:
+    radial-gradient(380px 170px at 0 0, color-mix(in srgb, var(--a2) var(--tint), transparent), transparent 72%),
+    radial-gradient(300px 150px at 100% 0, color-mix(in srgb, var(--a3) var(--tint), transparent), transparent 72%),
+    linear-gradient(168deg, rgb(var(--panel-2) / var(--bg-a)), rgb(var(--panel) / var(--bg-a)) 60%);
+  box-shadow: inset 0 1px 0 var(--hi);
   overflow: hidden;
-  opacity: var(--opacity);
+  overflow-wrap: anywhere;
+  opacity: clamp(0.72, calc(var(--opacity) + 0.3), 1);
 }
 
+/* filet du haut : le dégradé de l'accent */
 .panel::before {
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0) 75%);
+  background: linear-gradient(90deg, var(--a1), var(--a2) 40%, var(--a3) 78%, transparent);
+  opacity: 0.9;
 }
 
 body.move .panel {
@@ -213,10 +137,10 @@ body.move .panel {
 }
 
 #move-banner {
-  background: var(--accent);
+  background: var(--grad);
   color: var(--on-accent);
   font-weight: 700;
-  padding: 6px 12px;
+  padding: 7px 14px;
   font-size: 11.5px;
 }
 
@@ -225,9 +149,9 @@ body.move .panel {
   display: block;
   flex: none;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--fg-rgb), 0.16);
-  background: #161d2a;
+  border-radius: 9px;
+  border: 1px solid rgba(var(--fg-rgb), 0.17);
+  background: rgba(var(--fg-rgb), 0.07);
 }
 
 .ph {
@@ -237,6 +161,9 @@ body.move .panel {
   font-weight: 800;
   font-size: 11px;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  line-height: 1;
 }
 
 .round {
@@ -248,8 +175,7 @@ body.move .panel {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 13px 12px 11px;
-  background: linear-gradient(180deg, var(--accent-soft), rgba(var(--accent-rgb), 0));
+  padding: 14px 13px 11px;
 }
 
 .portrait {
@@ -260,14 +186,17 @@ body.move .panel {
 .portrait .ic {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  border: 2px solid var(--accent);
+  border-radius: 14px;
+  border: 0;
+  box-shadow:
+    0 0 0 1.5px var(--chip-bg),
+    0 0 0 3.5px var(--accent);
 }
 
 .lvl {
   position: absolute;
-  right: -5px;
-  bottom: -5px;
+  right: -6px;
+  bottom: -6px;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -292,9 +221,8 @@ body.move .panel {
   flex-wrap: wrap;
   align-items: center;
   gap: 3px 6px;
-  font-size: 15.5px;
-  font-weight: 700;
-  line-height: 1.25;
+  font: 700 15.5px/1.25 var(--font-display);
+  letter-spacing: -0.005em;
 }
 
 .name .champ {
@@ -305,15 +233,13 @@ body.move .panel {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 1px 6px;
-  border-radius: 5px;
-  background: var(--accent);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--grad);
   color: var(--on-accent);
-  font-size: 9.5px;
-  font-weight: 800;
+  font: 800 9.5px/1.5 var(--font);
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  line-height: 1.5;
 }
 
 .role em {
@@ -321,7 +247,7 @@ body.move .panel {
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
-  opacity: 0.72;
+  opacity: 0.76;
 }
 
 .sub {
@@ -357,7 +283,6 @@ body.move .panel {
   color: var(--dim);
 }
 
-
 .right {
   display: flex;
   flex-direction: column;
@@ -381,8 +306,9 @@ body.move .panel {
   flex: none;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(245, 196, 81, 0.1);
-  border: 1px solid rgba(245, 196, 81, 0.28);
+  background: rgba(245, 196, 81, 0.12);
+  border: 1px solid rgba(245, 196, 81, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: var(--gold);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -396,16 +322,26 @@ body.move .panel {
   flex: none;
 }
 
-/* ---------- sections ---------- */
+/* ---------- sections : des cellules de verre ---------- */
+.sec,
+.goal,
+.note {
+  margin: 0 8px 6px;
+  border-radius: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 rgba(var(--fg-rgb), 0.05);
+}
+
 .sec {
-  padding: 9px 12px;
-  border-top: 1px solid var(--line);
+  padding: 8px 10px 9px;
 }
 
 .label {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 2px 7px;
   margin-bottom: 8px;
   color: var(--muted);
   font-size: 10px;
@@ -416,15 +352,10 @@ body.move .panel {
 
 .label::before {
   content: '';
-  width: 3px;
-  height: 10px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-
-.label {
-  flex-wrap: wrap;
-  row-gap: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--a1), var(--a3));
 }
 
 .label .meta {
@@ -434,6 +365,76 @@ body.move .panel {
   text-transform: none;
   font-weight: 600;
   font-size: 10.5px;
+}
+
+/* ---------- objectif de session (la mascotte suit ton avancement) ---------- */
+.goal {
+  --goal: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px 8px;
+}
+
+.goal.behind {
+  --goal: var(--warn);
+}
+
+.goal.failed {
+  --goal: var(--danger);
+}
+
+.goal.done {
+  --goal: var(--ok);
+}
+
+.goal.wait {
+  --goal: var(--muted);
+}
+
+.goal-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.goal-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: 11.5px;
+}
+
+.goal .gt {
+  font-weight: 700;
+}
+
+.goal .gv {
+  font-weight: 800;
+  color: var(--goal);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal .gs {
+  margin-left: auto;
+  color: var(--goal);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.goal-bar {
+  margin-top: 5px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(var(--fg-rgb), 0.12);
+  overflow: hidden;
+}
+
+.goal-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--goal);
 }
 
 /* ---------- équipe adverse ---------- */
@@ -459,7 +460,7 @@ body.move .panel {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 2px solid rgba(var(--fg-rgb), 0.14);
+  border: 2px solid rgba(var(--fg-rgb), 0.15);
 }
 
 .enemy.opp .pic .ic {
@@ -468,7 +469,7 @@ body.move .panel {
 
 .enemy.fed .pic .ic {
   border-color: var(--danger);
-  box-shadow: 0 0 10px rgba(255, 93, 108, 0.55);
+  box-shadow: 0 0 10px rgba(var(--danger-rgb), 0.55);
 }
 
 .enemy .lvl {
@@ -485,8 +486,8 @@ body.move .panel {
   top: -6px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 0 4px;
-  border-radius: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
   background: var(--danger);
   color: #fff;
   font-size: 8.5px;
@@ -501,7 +502,7 @@ body.move .panel {
 }
 
 .enemy.fed .kda {
-  color: #ffb3ba;
+  color: color-mix(in srgb, var(--danger) 60%, var(--text));
   font-weight: 700;
 }
 
@@ -562,16 +563,19 @@ body.move .panel {
 .pick {
   display: flex;
   gap: 11px;
-  padding: 10px;
+  padding: 9px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.11), rgba(var(--fg-rgb), 0.025));
-  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--a1) 15%, transparent), color-mix(in srgb, var(--a3) 13%, transparent)),
+    rgba(var(--fg-rgb), 0.03);
+  border: 1px solid rgba(var(--accent-rgb), 0.34);
+  box-shadow: inset 0 1px 0 rgba(var(--fg-rgb), 0.07);
 }
 
 .pick .ic {
   width: 54px;
   height: 54px;
-  border-radius: 11px;
+  border-radius: 13px;
 }
 
 .pick-body {
@@ -581,6 +585,7 @@ body.move .panel {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -589,10 +594,6 @@ body.move .panel {
 .pick .iname {
   font-size: 14px;
   font-weight: 700;
-}
-
-.row {
-  flex-wrap: wrap;
 }
 
 .iname {
@@ -615,7 +616,7 @@ body.move .panel {
   height: 8px;
 }
 
-.why {
+ul.why {
   list-style: none;
   margin: 5px 0 0;
   padding: 0;
@@ -668,6 +669,7 @@ body.move .panel {
 .alt .ic {
   width: 36px;
   height: 36px;
+  border-radius: 10px;
 }
 
 .alt .iname {
@@ -686,14 +688,74 @@ body.move .panel {
 .situ {
   display: inline-block;
   margin-left: 6px;
-  padding: 0 5px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 181, 71, 0.5);
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--warn-rgb), 0.5);
   color: var(--warn);
   font-size: 9.5px;
   font-weight: 800;
   letter-spacing: 0.03em;
   vertical-align: 1px;
+}
+
+/* ---------- objet de support : quête terminée, à choisir maintenant ---------- */
+.sec.support {
+  border-color: rgba(var(--accent-rgb), 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--fg-rgb), 0.07),
+    0 0 0 2px rgba(var(--accent-rgb), 0.16);
+}
+
+.free {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(var(--ok-rgb), 0.16);
+  color: var(--ok);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.supalts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.supalts .t {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.supalt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.supalt .ic {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.supalt .n {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* ---------- achat ---------- */
@@ -709,6 +771,10 @@ body.move .panel {
   flex: 1;
   min-width: 0;
   font-weight: 650;
+}
+
+.buy.ready {
+  border-color: rgba(var(--ok-rgb), 0.4);
 }
 
 .buy.ready .buy-head .t {
@@ -750,8 +816,10 @@ body.move .panel {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 9px 4px 4px;
-  border-radius: 9px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--line);
 }
@@ -759,12 +827,7 @@ body.move .panel {
 .tile .ic {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-}
-
-.tile {
-  min-width: 0;
-  max-width: 100%;
+  border-radius: 50%;
 }
 
 .tile .n {
@@ -819,11 +882,11 @@ body.move .panel {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 6px 9px 6px 11px;
   margin-top: 5px;
-  border-radius: 8px;
-  background: var(--surface);
-  border-left: 3px solid var(--warn);
+  border-radius: 10px;
+  background: rgba(var(--warn-rgb), 0.08);
+  box-shadow: inset 3px 0 0 var(--warn);
 }
 
 .alert:first-of-type {
@@ -831,12 +894,13 @@ body.move .panel {
 }
 
 .alert.high {
-  border-left-color: var(--danger);
-  background: rgba(255, 93, 108, 0.08);
+  background: rgba(var(--danger-rgb), 0.1);
+  box-shadow: inset 3px 0 0 var(--danger);
 }
 
 .alert.info {
-  border-left-color: var(--ap);
+  background: rgba(var(--ap-rgb), 0.08);
+  box-shadow: inset 3px 0 0 var(--ap);
 }
 
 .alert .txt {
@@ -875,6 +939,7 @@ body.move .panel {
 .step .ic {
   width: 36px;
   height: 36px;
+  border-radius: 10px;
 }
 
 .step.owned .ic {
@@ -910,9 +975,10 @@ body.move .panel {
   flex-direction: column;
   align-items: flex-start;
   gap: 7px;
-  padding: 9px 12px 10px;
+  margin-top: 2px;
+  padding: 9px 14px 10px;
   border-top: 1px solid var(--line);
-  background: rgba(var(--fg-rgb), 0.05);
+  background: rgba(var(--fg-rgb), 0.04);
 }
 
 .skills {
@@ -931,12 +997,16 @@ body.move .panel {
   margin-right: 3px;
 }
 
+.skills .t.first {
+  margin-left: 8px;
+}
+
 .kc {
   width: 21px;
   height: 21px;
-  border-radius: 5px;
-  background: #182030;
-  border: 1px solid #2b3648;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid rgba(var(--fg-rgb), 0.17);
   border-bottom-width: 2px;
   color: var(--accent);
   font-weight: 900;
@@ -980,16 +1050,14 @@ body.move .panel {
 .versus .ic {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: 11px;
   border: 2px solid var(--danger);
 }
 
 .note {
-  padding: 7px 12px;
+  padding: 7px 10px;
   font-size: 11px;
   color: var(--muted);
-  background: var(--surface);
-  border-top: 1px solid var(--line);
 }
 
 .picks {
@@ -1002,7 +1070,7 @@ body.move .panel {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 2px solid rgba(var(--fg-rgb), 0.14);
+  border: 2px solid rgba(var(--fg-rgb), 0.15);
 }
 
 .picks .opp .ic {
@@ -1117,8 +1185,8 @@ body.move .panel {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 8px;
-  padding: 8px 12px;
-  background: var(--accent);
+  padding: 8px 14px;
+  background: var(--grad);
   color: var(--on-accent);
   font-size: 11.5px;
   font-weight: 700;
@@ -1126,74 +1194,10 @@ body.move .panel {
 
 .hint kbd {
   padding: 1px 6px;
-  border-radius: 5px;
-  background: rgba(6, 21, 18, 0.16);
-  border: 1px solid rgba(6, 21, 18, 0.3);
-  font: 800 11px/1.4 ui-monospace, Consolas, monospace;
-}
-
-/* ---------- message ---------- */
-.msg {
-  padding: 16px 14px;
-}
-
-.msg-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 4px;
-}
-
-.msg-text {
-  color: var(--muted);
-}
-
-/* ---------- toast ---------- */
-#toast {
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  border-top: 1px solid var(--line);
-}
-
-#toast.ok {
-  color: var(--ok);
-}
-
-#toast.warn {
-  color: var(--warn);
-}
-
-#toast.info {
-  color: var(--ap);
-}
-
-/* ---------- mode compact ---------- */
-body.compact .hide-compact {
-  display: none;
-}
-
-/* ---------- textes : jamais coupés, ils passent à la ligne ---------- */
-.panel {
-  overflow-wrap: anywhere;
-}
-
-/* pastilles et nombres : ne se coupent jamais au milieu */
-.fedtag,
-.lvl,
-.situ,
-.kc,
-.count,
-.check,
-.cost,
-.goldpill,
-.clock,
-.kda,
-kbd,
-.role,
-.versus .vs {
-  overflow-wrap: normal;
-  white-space: nowrap;
+  border-radius: 6px;
+  background: rgba(6, 12, 30, 0.18);
+  border: 1px solid rgba(6, 12, 30, 0.3);
+  font: 800 11px/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace;
 }
 
 .hint .txt {
@@ -1232,10 +1236,11 @@ kbd,
   font-weight: 600;
 }
 
-.hint.runes kbd {
+.hint.runes kbd,
+.hint.role-hint kbd {
   color: var(--accent);
-  background: rgba(var(--fg-rgb), 0.04);
-  border-color: rgba(var(--fg-rgb), 0.14);
+  background: rgba(var(--fg-rgb), 0.05);
+  border-color: rgba(var(--fg-rgb), 0.16);
 }
 
 .hint.role-hint {
@@ -1247,19 +1252,93 @@ kbd,
   padding-bottom: 7px;
 }
 
-.hint.role-hint kbd {
+/* ---------- message (en attente, déplacement) : la mascotte à gauche ---------- */
+.msg {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 14px;
+}
+
+.msg > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.msg .mascot {
+  --ms: 38px !important;
+}
+
+.msg-title {
+  font: 700 13.5px/1.3 var(--font-display);
   color: var(--accent);
+  margin-bottom: 3px;
+}
+
+.msg-text {
+  color: var(--muted);
+}
+
+.sec.empty {
+  color: var(--muted);
+}
+
+/* ---------- notification ---------- */
+#toast {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-top: 1px solid var(--line);
   background: rgba(var(--fg-rgb), 0.04);
-  border-color: rgba(var(--fg-rgb), 0.14);
 }
 
-/* initiales à la place d'une icône manquante : jamais coupées, réduites dans les petites icônes */
-.ph {
-  white-space: nowrap;
+#toast.ok {
+  color: var(--ok);
+}
+
+#toast.warn {
+  color: var(--warn);
+}
+
+#toast.info {
+  color: var(--ap);
+}
+
+/* ---------- mode compact ---------- */
+body.compact .hide-compact {
+  display: none;
+}
+
+/* dernière cellule : un peu d'air avant le bord du panneau */
+#app > .sec:last-child,
+#app > .goal:last-child,
+#app > .note:last-child {
+  margin-bottom: 8px;
+}
+
+body.compact #app > .sec:not(.hide-compact):last-of-type {
+  margin-bottom: 8px;
+}
+
+/* pastilles et nombres : ne se coupent jamais au milieu */
+.fedtag,
+.lvl,
+.situ,
+.kc,
+.count,
+.check,
+.cost,
+.goldpill,
+.clock,
+.kda,
+kbd,
+.role,
+.versus .vs {
   overflow-wrap: normal;
-  line-height: 1;
+  white-space: nowrap;
 }
 
+/* initiales à la place d'une icône manquante : réduites dans les petites icônes */
 .sub .ph,
 .tree .ph {
   font-size: 7px;
@@ -1268,15 +1347,21 @@ kbd,
 
 .champs .ph,
 .shard .ph,
-.runes .shard .ph {
+.runes .shard .ph,
+.supalt .ph {
   font-size: 8px;
 }
 
 /* Classique : ambiance League of Legends (titres à empattements, or et bleu nuit) */
-:root[data-accent='classic'] .name .champ,
-:root[data-accent='classic'] .label {
+:root[data-accent='classic'] .name,
+:root[data-accent='classic'] .label,
+:root[data-accent='classic'] .msg-title {
   font-family: 'Beaufort for LOL', 'Beaufort', Georgia, 'Times New Roman', serif;
   letter-spacing: 0.02em;
+}
+
+:root[data-accent='classic'] .label {
+  letter-spacing: 0.1em;
 }
 
 /* ---------- départ (début de partie) ---------- */
@@ -1286,8 +1371,9 @@ kbd,
   align-items: center;
   gap: 9px;
   padding: 7px 8px;
-  border-radius: 10px;
+  border-radius: 11px;
   border: 1px solid var(--line);
+  background: rgba(var(--fg-rgb), 0.025);
 }
 
 .starters .start + .start {
@@ -1296,18 +1382,20 @@ kbd,
 
 .starters .start.best {
   margin-top: 12px;
-  border: 2px solid var(--accent);
-  background: var(--accent-soft);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--a1) 15%, transparent), color-mix(in srgb, var(--a3) 13%, transparent)),
+    rgba(var(--fg-rgb), 0.03);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.16);
 }
 
 .starters .bubble {
   position: absolute;
   top: -10px;
   left: 10px;
-  padding: 1px 8px;
-  border-radius: 9px;
-  background: var(--accent);
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--grad);
   color: var(--on-accent);
   font-size: 10px;
   font-weight: 800;
@@ -1334,9 +1422,11 @@ kbd,
   position: absolute;
   right: -3px;
   bottom: -3px;
+  margin: 0;
   padding: 0 3px;
   border-radius: 5px;
   background: var(--chip-bg);
+  color: var(--text);
   font-size: 9.5px;
   font-weight: 800;
   white-space: nowrap;
@@ -1378,6 +1468,7 @@ kbd,
 .fullbuild .slot .ic {
   width: 40px;
   height: 40px;
+  border-radius: 11px;
 }
 
 .fullbuild .slot.owned .ic {
@@ -1388,14 +1479,24 @@ kbd,
   box-shadow: 0 0 0 2px var(--warn);
 }
 
+/* objet de support : cerclé de l'accent (et signalé quand il est à choisir) */
+.fullbuild .slot.sup .ic {
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1.5px var(--chip-bg),
+    0 0 0 3px var(--accent);
+}
+
 .fullbuild .check,
 .fullbuild .flag {
   position: absolute;
   right: 0;
   bottom: -3px;
+  width: auto;
   min-width: 15px;
   height: 15px;
   padding: 0 3px;
+  border: 0;
   border-radius: 8px;
   font-size: 10px;
   font-weight: 900;
@@ -1405,8 +1506,9 @@ kbd,
 }
 
 .fullbuild .check {
+  display: block;
   background: var(--ok);
-  color: #fff;
+  color: #04210f;
 }
 
 .fullbuild .flag {
@@ -1414,48 +1516,23 @@ kbd,
   color: #1a1000;
 }
 
-.why {
+.fullbuild .slot.choose .flag {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+div.why {
   margin-top: 7px;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.35;
 }
 
-.why b {
+div.why b {
   color: var(--warn);
   font-weight: 700;
 }
 
-/* ---------- objectif de session ---------- */
-.goal {
-  padding: 7px 12px 8px;
-  border-top: 1px solid var(--line, rgba(255, 255, 255, 0.08));
-  --goal: var(--accent);
-}
-.goal.behind { --goal: var(--warn, #ffb547); }
-.goal.failed { --goal: var(--danger, #ff5d6c); }
-.goal.done { --goal: var(--ok, #3ddc84); }
-.goal.wait { --goal: var(--muted, #8a97a8); }
-.goal-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 8px;
-  font-size: 11.5px;
-}
-.goal .gt { font-weight: 700; }
-.goal .gv { font-weight: 800; color: var(--goal); font-variant-numeric: tabular-nums; }
-.goal .gs { margin-left: auto; color: var(--goal); font-size: 10.5px; font-weight: 700; }
-.goal-bar {
-  margin-top: 5px;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(127, 127, 127, 0.25);
-  overflow: hidden;
-}
-.goal-bar span {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--goal);
+div.why b.supname {
+  color: var(--accent-hi);
 }
